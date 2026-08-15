@@ -1,0 +1,18 @@
+{
+    "id": "dock",
+    "name": "Dock",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Bottom dock with pinned apps, running windows and media controls.",
+    "author": "illogical-impulse",
+    "icon": "dock_to_bottom",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "dock",
+                "entry": "Dock.qml"
+            }
+        ]
+    }
+}

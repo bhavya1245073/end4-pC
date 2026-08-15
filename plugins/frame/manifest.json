@@ -1,0 +1,18 @@
+{
+    "id": "frame",
+    "name": "Screen Frame",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Decorative frame drawn around the screen edges.",
+    "author": "illogical-impulse",
+    "icon": "filter_frames",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "screenFrame",
+                "entry": "ScreenFrame.qml"
+            }
+        ]
+    }
+}

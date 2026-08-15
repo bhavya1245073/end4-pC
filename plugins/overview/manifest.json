@@ -1,0 +1,18 @@
+{
+    "id": "overview",
+    "name": "Overview",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Workspace overview and the search launcher.",
+    "author": "illogical-impulse",
+    "icon": "grid_view",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "overview",
+                "entry": "Overview.qml"
+            }
+        ]
+    }
+}

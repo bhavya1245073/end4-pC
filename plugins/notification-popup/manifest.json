@@ -1,0 +1,18 @@
+{
+    "id": "notification-popup",
+    "name": "Notification Popups",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Toasts for incoming notifications, with grouping and actions.",
+    "author": "illogical-impulse",
+    "icon": "notifications",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "notificationPopup",
+                "entry": "NotificationPopup.qml"
+            }
+        ]
+    }
+}

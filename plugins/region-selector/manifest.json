@@ -1,0 +1,18 @@
+{
+    "id": "region-selector",
+    "name": "Region Selector",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Region picker for screenshots, OCR and screen recording.",
+    "author": "illogical-impulse",
+    "icon": "crop",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "regionSelector",
+                "entry": "RegionSelector.qml"
+            }
+        ]
+    }
+}

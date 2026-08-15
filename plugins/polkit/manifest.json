@@ -1,0 +1,18 @@
+{
+    "id": "polkit",
+    "name": "Polkit Agent",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Authentication dialog for privileged actions.",
+    "author": "illogical-impulse",
+    "icon": "admin_panel_settings",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "polkit",
+                "entry": "Polkit.qml"
+            }
+        ]
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "id": "screen-translator",
+    "name": "Screen Translator",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Grab a region of the screen, OCR it and translate the text.",
+    "author": "illogical-impulse",
+    "icon": "translate",
+    "enabledByDefault": true,
+    "provides": {
+        "panels": [
+            {
+                "id": "screenTranslator",
+                "entry": "ScreenTranslator.qml"
+            }
+        ]
+    }
+}
