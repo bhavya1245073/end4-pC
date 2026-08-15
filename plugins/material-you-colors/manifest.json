@@ -1,0 +1,230 @@
+{
+  "id": "material-you-colors",
+  "name": "Material You Colors (KDE/Qt & terminals)",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Applies the wallpaper palette to KDE/Qt apps, Konsole, KSyntaxHighlighting, window decorations and terminals. Every setting here is re-read by the wallpaper switcher too, so it stays in effect on the next wallpaper change.",
+  "author": "bhavya",
+  "icon": "palette",
+  "enabledByDefault": true,
+  "runtimeDeps": [
+    "kde-material-you"
+  ],
+  "provides": {
+    "services": [
+      {
+        "id": "materialYouColors",
+        "entry": "MaterialYouColors.qml"
+      }
+    ],
+    "launcherActions": [
+      {
+        "id": "retheme",
+        "exec": [
+          "kde-material-you"
+        ]
+      }
+    ]
+  },
+  "settings": [
+    {
+      "key": "ncolor",
+      "type": "int",
+      "default": 0,
+      "min": 0,
+      "max": 6,
+      "step": 1,
+      "label": "Wallpaper colour to theme from",
+      "description": "The wallpaper is scored down to seven colours, best first. 0 is the one the shell itself uses; raise it to theme KDE from a different colour in the same image.",
+      "icon": "colorize"
+    },
+    {
+      "key": "contrast",
+      "type": "real",
+      "default": 0,
+      "min": -1,
+      "max": 1,
+      "label": "Contrast",
+      "description": "Pushes foreground and background apart. 0 is the Material default.",
+      "icon": "contrast"
+    },
+    {
+      "key": "chromaMultiplier",
+      "type": "real",
+      "default": 1,
+      "min": 0,
+      "max": 3,
+      "label": "Saturation",
+      "description": "Multiplies the colourfulness of every role. 1 is unchanged, 0 is grey.",
+      "icon": "water_drop"
+    },
+    {
+      "key": "toneMultiplier",
+      "type": "real",
+      "default": 1,
+      "min": 0,
+      "max": 3,
+      "label": "Lightness",
+      "description": "Multiplies the lightness of every role. 1 is unchanged.",
+      "icon": "brightness_6"
+    },
+    {
+      "key": "frameContrast",
+      "type": "real",
+      "default": 0.2,
+      "min": 0,
+      "max": 1,
+      "label": "Frame contrast",
+      "description": "How visible the borders between panes are in Qt apps.",
+      "icon": "border_outer"
+    },
+    {
+      "key": "toolbarOpacity",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "label": "Toolbar opacity, light",
+      "description": "Applied to the window chrome of Qt apps in the light scheme.",
+      "icon": "opacity"
+    },
+    {
+      "key": "toolbarOpacityDark",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "label": "Toolbar opacity, dark",
+      "icon": "opacity"
+    },
+    {
+      "key": "terminal",
+      "type": "bool",
+      "default": true,
+      "label": "Theme terminals",
+      "description": "Writes foot's palette file and repaints open terminals, including the 256-colour slots the shell prompt uses. Turn this off to manage terminal colours yourself.",
+      "icon": "terminal"
+    },
+    {
+      "key": "pywal",
+      "type": "bool",
+      "default": true,
+      "label": "Write pywal files",
+      "description": "~/.cache/wal/*, for anything that reads a pywal palette.",
+      "icon": "folder_data"
+    },
+    {
+      "key": "pywalMode",
+      "type": "enum",
+      "default": "auto",
+      "label": "Terminal light/dark",
+      "description": "Terminals can stay dark while the rest of the session goes light.",
+      "icon": "dark_mode",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Follow the session"
+        },
+        {
+          "value": "dark",
+          "label": "Always dark"
+        },
+        {
+          "value": "light",
+          "label": "Always light"
+        }
+      ]
+    },
+    {
+      "key": "konsole",
+      "type": "bool",
+      "default": true,
+      "label": "Theme Konsole",
+      "description": "Writes a Konsole colour scheme and switches open windows onto it.",
+      "icon": "terminal"
+    },
+    {
+      "key": "konsoleOpacity",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "label": "Konsole opacity, light",
+      "icon": "opacity"
+    },
+    {
+      "key": "konsoleOpacityDark",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "label": "Konsole opacity, dark",
+      "icon": "opacity"
+    },
+    {
+      "key": "konsoleBlur",
+      "type": "bool",
+      "default": false,
+      "label": "Blur behind Konsole",
+      "icon": "blur_on"
+    },
+    {
+      "key": "decorations",
+      "type": "bool",
+      "default": true,
+      "label": "Theme window decorations",
+      "description": "Breeze and Sierra Breeze Enhanced button colours, Klassy's outline, and KWin's rounded-corner outline. Each one is only touched if it is actually installed, so this does nothing under Hyprland alone.",
+      "icon": "window"
+    },
+    {
+      "key": "titlebarOpacityEnable",
+      "type": "bool",
+      "default": false,
+      "label": "Set titlebar opacity",
+      "description": "Off leaves Klassy and Sierra Breeze Enhanced's own opacity settings alone, which is different from setting them to 100%.",
+      "icon": "opacity"
+    },
+    {
+      "key": "titlebarOpacity",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "label": "Titlebar opacity, light",
+      "icon": "opacity"
+    },
+    {
+      "key": "titlebarOpacityDark",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "label": "Titlebar opacity, dark",
+      "icon": "opacity"
+    },
+    {
+      "key": "darkerWindowList",
+      "type": "string",
+      "default": "",
+      "label": "Darker titlebar for",
+      "description": "Space separated window classes that get a darker titlebar, via a KWin rule. Needs KWin.",
+      "icon": "filter_alt",
+      "placeholder": "code foot"
+    },
+    {
+      "key": "onChangeHook",
+      "type": "string",
+      "default": "",
+      "label": "Run after applying",
+      "description": "A shell command, run once the colours are on disk. $KDE_MATERIAL_YOU_JSON, $KDE_MATERIAL_YOU_MODE and $KDE_MATERIAL_YOU_SCHEME are set for it.",
+      "icon": "terminal",
+      "placeholder": "notify-send 'Theme applied'"
+    }
+  ]
+}

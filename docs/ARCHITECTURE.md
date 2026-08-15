@@ -30,7 +30,8 @@ What is left in `modules/ii/` is there because plugins extend it:
 Everything else ships as a plugin: `dock`, `overview`, `lock`, `overlay`,
 `polkit`, `region-selector`, `session-screen`, `notification-popup`,
 `media-controls`, `on-screen-display`, `on-screen-keyboard`, `screen-corners`,
-`screen-translator`, `wallpaper-selector`, `desktop-menu`, `dropover`, `frame`.
+`screen-translator`, `wallpaper-selector`, `desktop-menu`, `dropover`, `frame`,
+`material-you-colors`.
 
 Each is a folder with a `manifest.json` declaring `provides.panels`. Nothing
 imports them and no file lists them — `PluginHost` loads whatever
@@ -65,8 +66,11 @@ those two components into `modules/common/widgets/` would remove the last edges.
 
 - Writing a plugin: [PLUGINS.md](PLUGINS.md).
 - `scripts/new-plugin.sh <id>` scaffolds one.
-- `scripts/check-qml.sh [subtree]` compiles the tree and reports unresolved
-  imports and types without starting a shell.
+- `scripts/check-qml.sh [subtree]` compiles every QML file in the tree and
+  reports the ones whose imports or types do not resolve. It exits non-zero if
+  anything failed, so it works as a pre-commit hook. A clean tree reports
+  `failures=0`; if you see a wall of "module ... is not installed", read the
+  comment at the top of the script.
 - Pulling upstream in: merge `upstream/main` into this branch. Because features
   moved with `git mv`, rename detection follows upstream edits into
   `plugins/<id>/` on its own.

@@ -168,7 +168,11 @@ PluginConfig.reset("my-plugin", "format")     // back to the manifest default
 ```
 
 Anything the manifest never declared is preserved too, so a plugin can stash
-runtime state in the same place.
+runtime state in the same place. `plugins/material-you-colors` uses that for an
+`appliedSnapshot` key: it records the settings that were in effect at the end of
+the last successful run, so the plugin can tell "the shell just restarted and
+nothing changed" from "I was just enabled" without a control appearing in the GUI
+for it.
 
 ## Base types
 
@@ -318,8 +322,8 @@ installing anything.
   with `journalctl --user -f -t quickshell` or by running `qs` in a terminal.
 - `scripts/check-qml.sh plugins` compiles every plugin file and prints the ones
   whose imports or types don't resolve, without starting a shell or touching the
-  one you're running. Read its caveat first: a few `module ... is not installed`
-  lines show up even on a clean tree.
+  one you're running. It exits non-zero if anything failed; a clean tree prints
+  `failures=0` and nothing else.
 - A plugin that fails to load can't take the shell down with it - the rest keeps
   running.
 
