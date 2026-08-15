@@ -18,36 +18,17 @@ ContentPage {
         Quickshell.execDetached([
             "kitty", "--hold",
             "fish", "-i", "-l", "-c",
-            "yay -Syu --combinedupgrade=false"
+            "sudo nixos-rebuild switch --flake ~/nixos-pc#nixos --accept-flake-config"
         ])
         Qt.callLater(() => GlobalStates.settingsOpen = false)
     }
 
     function runUpdateDots() {
-        const updateScript = `
-            set -e
-            DIR="$HOME/.config/quickshell"
-
-            # Download to temp first
-            rm -rf "$DIR/end4-pC-tmp"
-            git clone https://github.com/pctrade/end4-pC.git "$DIR/end4-pC-tmp"
-
-            # Apply update
-            rm -rf "$DIR/end4-pC-old"
-            [ -d "$DIR/end4-pC" ] && mv "$DIR/end4-pC" "$DIR/end4-pC-old"
-            mv "$DIR/end4-pC-tmp" "$DIR/end4-pC"
-
-            # Reload
-            killall qs 2>/dev/null || true
-            sleep 0.5
-            setsid qs -c end4-pC >/tmp/qs.log 2>&1 < /dev/null &
-            disown
-
-            # Cleanup
-            rm -rf "$DIR/end4-pC-old"
-        `
-
-        Quickshell.execDetached(["kitty", "--hold", "bash", "-c", updateScript])
+        Quickshell.execDetached([
+            "kitty", "--hold",
+            "bash", "-c",
+            "nix flake update --flake ~/nixos-pc end4-pc && sudo nixos-rebuild switch --flake ~/nixos-pc#nixos --accept-flake-config"
+        ])
         Qt.callLater(() => GlobalStates.settingsOpen = false)
     }
 
