@@ -35,7 +35,7 @@ apply_kitty() {
   fi
   # Copy template
   mkdir -p "$STATE_DIR"/user/generated/terminal
-  cp "$SCRIPT_DIR/terminal/kitty-theme.conf" "$STATE_DIR"/user/generated/terminal/kitty-theme.conf
+  install -m644 "$SCRIPT_DIR/terminal/kitty-theme.conf" "$STATE_DIR"/user/generated/terminal/kitty-theme.conf
   # Apply colors
   for i in "${!colorlist[@]}"; do
     sed -i "s/${colorlist[$i]} #/${colorvalues[$i]#\#}/g" "$STATE_DIR"/user/generated/terminal/kitty-theme.conf
@@ -53,7 +53,7 @@ apply_anyterm() {
   fi
   # Copy template
   mkdir -p "$STATE_DIR"/user/generated/terminal
-  cp "$SCRIPT_DIR/terminal/sequences.txt" "$STATE_DIR"/user/generated/terminal/sequences.txt
+  install -m644 "$SCRIPT_DIR/terminal/sequences.txt" "$STATE_DIR"/user/generated/terminal/sequences.txt
   # Apply colors
   for i in "${!colorlist[@]}"; do
     sed -i "s/${colorlist[$i]} #/${colorvalues[$i]#\#}/g" "$STATE_DIR"/user/generated/terminal/sequences.txt
