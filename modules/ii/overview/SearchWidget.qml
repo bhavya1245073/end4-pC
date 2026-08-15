@@ -15,6 +15,7 @@ import qs.modules.common.functions
 Item { // Wrapper
     id: root
 
+    readonly property real dpr: Math.max(1, root.QsWindow.window?.devicePixelRatio ?? 1)
     readonly property string xdgConfigHome: Directories.config
     readonly property int typingDebounceInterval: 200
     readonly property int typingResultLimit: 15 // Should be enough to cover the whole view
@@ -129,10 +130,12 @@ Item { // Wrapper
 
             // clip: true
             layer.enabled: true
+            layer.smooth: true
+            layer.textureSize: Qt.size(Math.ceil(columnLayout.width * root.dpr), Math.ceil(columnLayout.height * root.dpr))
             layer.effect: OpacityMask {
                 maskSource: Rectangle {
                     width: searchWidgetContent.width
-                    height: searchWidgetContent.width
+                    height: searchWidgetContent.height
                     radius: searchWidgetContent.radius
                 }
             }
