@@ -128,6 +128,27 @@ An ordered array. Each entry becomes one row in the plugin's card under
 validated against the schema on read, so a hand-edited `plugins.json` can't feed
 your plugin a string where it expects a number.
 
+## Several files, subfolders and singletons
+
+A plugin folder is not a QML module, so type resolution follows plain QML file
+rules:
+
+- **Siblings resolve by name.** `MyPanel.qml` can use `Helper {}` from
+  `Helper.qml` next to it with no import at all.
+- **Subfolders need a relative directory import.** From the plugin root,
+  `import "widgets"`; from inside `widgets/`, `import ".."` to reach back up.
+- **Singletons need a `qmldir`.** A `pragma Singleton` file resolves to
+  `undefined` without one. Two lines fix it:
+
+  ```
+  # plugins/my-plugin/qmldir
+  singleton MyState 1.0 MyState.qml
+  ```
+
+  and every file that reads `MyState` adds `import "."` (files in a subfolder
+  use `import ".."` as usual). Listing only the singleton is enough — the other
+  files in the folder keep resolving implicitly.
+
 ## Reading settings from QML
 
 ```qml
@@ -246,6 +267,11 @@ Do **not** import from `qs.modules.ii.*` - that's the illogical-impulse panel
 family's internals and is free to change. If you need something from it, it
 belongs in `modules/common` instead; open an issue.
 
+The stock panels under `plugins/` are the one exception: they ship with the
+shell, so `plugins/lock` and `plugins/overlay` do reach into `qs.modules.ii.bar`
+and `qs.modules.ii.sidebarRight` for a component each. They get to break with
+those modules; your plugin doesn't have to.
+
 ## Enable state and the config file
 
 `~/.config/illogical-impulse/plugins.json`, written by the GUI:
@@ -277,7 +303,7 @@ the whole folder is copied into the store, so no flake edit is needed to add one
 For an out-of-tree plugin, add it to your NixOS config:
 
 ```nix
-programs.end4.quickshell.plugins.my-plugin = ./path/to/my-plugin;
+programs.end4.plugins.my-plugin = ./path/to/my-plugin;
 ```
 
 `runtimeDeps` from every installed manifest are resolved against `pkgs` and added
@@ -290,6 +316,10 @@ installing anything.
   `id` not matching the folder, unsupported `apiVersion`).
 - Load failures are logged as `[plugins] <id>: could not load <file>`; watch them
   with `journalctl --user -f -t quickshell` or by running `qs` in a terminal.
+- `scripts/check-qml.sh plugins` compiles every plugin file and prints the ones
+  whose imports or types don't resolve, without starting a shell or touching the
+  one you're running. Read its caveat first: a few `module ... is not installed`
+  lines show up even on a clean tree.
 - A plugin that fails to load can't take the shell down with it - the rest keeps
   running.
 
