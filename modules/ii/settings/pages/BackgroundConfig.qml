@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -1072,6 +1073,72 @@ ContentPage {
                     }
                 }
             }
+            ContentSubsection {
+                title: Translation.tr("From plugins")
+                visible: PluginRegistry.desktopWidgets.length > 0
+                Layout.bottomMargin: 10
+
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 3
+                    rowSpacing: 8
+                    columnSpacing: 8
+                    Repeater {
+                        model: PluginRegistry.desktopWidgets
+                        delegate: Rectangle {
+                            id: pluginWidgetCard
+
+                            required property var modelData
+                            readonly property bool widgetEnabled: PluginConfig.widgetEnabled(pluginWidgetCard.modelData.pluginId, pluginWidgetCard.modelData.id, pluginWidgetCard.modelData.enabledByDefault !== false)
+
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 105
+                            radius: Appearance.rounding.normal
+                            color: Appearance.colors.colLayer1
+                            border.width: 1
+                            border.color: Appearance.colors.colLayer0Border
+                            ColumnLayout {
+                                anchors {
+                                    top: parent.top
+                                    left: parent.left
+                                    right: parent.right
+                                    margins: 12
+                                }
+                                spacing: 0
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    MaterialSymbol {
+                                        text: pluginWidgetCard.modelData.icon ?? "extension"
+                                        iconSize: Appearance.font.pixelSize.normal + 5
+                                        color: Appearance.colors.colPrimary
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    ConfigSwitch {
+                                        Layout.fillWidth: false
+                                        checked: pluginWidgetCard.widgetEnabled
+                                        onCheckedChanged: PluginConfig.setWidgetEnabled(pluginWidgetCard.modelData.pluginId, pluginWidgetCard.modelData.id, checked)
+                                    }
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: pluginWidgetCard.modelData.name ?? pluginWidgetCard.modelData.id
+                                    font.pixelSize: Appearance.font.pixelSize.normal
+                                    color: Appearance.colors.colOnLayer1
+                                    elide: Text.ElideRight
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: pluginWidgetCard.modelData.pluginName
+                                    font.pixelSize: Appearance.font.pixelSize.small
+                                    color: Appearance.colors.colSubtext
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             ContentSubsection {
                 title: Translation.tr("Canvas")
                 Layout.bottomMargin: 10

@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Services.UPower
 import Quickshell.Services.SystemTray
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -29,8 +30,13 @@ Item {
     readonly property var effectiveMiddleLayout: filterLayout(Config.options.bar.layouts.middleLayout)
     readonly property var effectiveRightLayout:  filterLayout(Config.options.bar.layouts.rightLayout)
 
+    // Resolves a layout entry to a QML file. Plugin-provided widgets are looked
+    // up first, so a plugin can both add new widgets and replace a stock one by
+    // reusing its id.
     function getWidgetUrl(name) {
         if (!name) return "";
+        const pluginWidget = PluginRegistry.barWidget(name);
+        if (pluginWidget) return pluginWidget.url;
         let formattedName = name.charAt(0).toUpperCase() + name.slice(1);
         return Qt.resolvedUrl("./" + formattedName + ".qml");
     }
@@ -42,6 +48,9 @@ Item {
 
     function shouldPaintMaterialPill(name) {
         if (Config.options.bar.cornerStyle !== 3) return false;
+        // Plugins opt out with `"materialPill": false` in their manifest.
+        const pluginWidget = PluginRegistry.barWidget(name);
+        if (pluginWidget) return pluginWidget.materialPill !== false;
         const blacklist = ["workspaces", "divisor", "powerButton", "docktoPanel", "leftSidebarButton", "activeWindow"];
         if (blacklist.includes(name)) {
             return false;
@@ -51,6 +60,9 @@ Item {
 
     function getMaterialPillColor(name) {
         if (Config.options.bar.cornerStyle !== 3) return Appearance.colors.colPrimaryContainer;
+        // Plugins pick one with `"pillColor": "secondaryContainer"`.
+        const pluginWidget = PluginRegistry.barWidget(name);
+        if (pluginWidget?.pillColor) return Appearance.getColorFromName(pluginWidget.pillColor);
         switch(name) {
             case "media":
             case "sysTray":

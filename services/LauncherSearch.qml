@@ -1,6 +1,7 @@
 pragma Singleton
 
 import qs.services
+import qs.core
 import qs.modules.common
 import qs.modules.common.models
 import qs.modules.common.functions
@@ -123,6 +124,28 @@ Singleton {
         sortField: FolderListModel.Name
     }
 
+    // Actions declared by plugins as `provides.launcherActions`, e.g.
+    //   { "id": "focusmode", "exec": ["notify-send", "Focus mode"] }
+    //   { "id": "backup", "script": "scripts/backup.sh" }
+    // Anything the user types after the action name is appended as arguments.
+    property var pluginActions: {
+        const actions = [];
+        for (const entry of PluginRegistry.launcherActions) {
+            if (!entry.id)
+                continue;
+            const command = Array.isArray(entry.exec) ? entry.exec.slice() : entry.script ? [`${PluginRegistry.pluginsDir}/${entry.pluginId}/${entry.script}`] : null;
+            if (!command)
+                continue;
+            actions.push({
+                action: entry.id,
+                execute: (cmd => args => {
+                    Quickshell.execDetached([...cmd, ...(args ? args.split(" ") : [])]);
+                })(command)
+            });
+        }
+        return actions;
+    }
+
     property var searchActions: [
         {
             action: "accentcolor",
@@ -216,7 +239,7 @@ Singleton {
     ]
 
     // Combined built-in and user actions
-    property var allActions: searchActions.concat(userActionScripts)
+    property var allActions: searchActions.concat(userActionScripts).concat(pluginActions)
 
     property string mathResult: ""
     property bool clipboardWorkSafetyActive: {

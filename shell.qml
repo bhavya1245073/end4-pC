@@ -7,6 +7,7 @@
 import "modules/common"
 import "services"
 import "panelFamilies"
+import "core"
 import QtQuick
 import QtQuick.Window
 import Quickshell
@@ -55,6 +56,10 @@ ShellRoot {
         identifier: "ii"
         component: IllogicalImpulseFamily {}
     }
+
+    // Everything under plugins/ - services and panels alike. Adding a plugin
+    // never means touching this file.
+    PluginHost {}
 
     component PanelFamilyLoader: LazyLoader {
         required property string identifier

@@ -5,6 +5,7 @@ import Quickshell.Bluetooth
 import Quickshell.Services.UPower
 import Quickshell.Services.SystemTray
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -37,6 +38,8 @@ Item {
 
     function shouldPaintMaterialPill(name) {
         if (Config.options.bar.cornerStyle !== 3) return false;
+        const pluginWidget = PluginRegistry.barWidget(name);
+        if (pluginWidget) return pluginWidget.materialPill !== false;
         const blacklist = ["workspaces", "divisor", "powerButton", "media", "docktoPanel", "leftSidebarButton"];
         if (blacklist.includes(name)) {
             return false;
@@ -46,6 +49,8 @@ Item {
 
     function getMaterialPillColor(name) {
         if (Config.options.bar.cornerStyle !== 3) return Appearance.colors.colPrimaryContainer;
+        const pluginWidget = PluginRegistry.barWidget(name);
+        if (pluginWidget?.pillColor) return Appearance.getColorFromName(pluginWidget.pillColor);
         switch(name) {
             case "media":
             case "sysTray":
@@ -61,6 +66,8 @@ Item {
 
     function getWidgetUrl(name) {
         if (!name) return "";
+        const pluginWidget = PluginRegistry.barWidget(name);
+        if (pluginWidget) return pluginWidget.url;
         let formattedName = name.charAt(0).toUpperCase() + name.slice(1);
         return Qt.resolvedUrl("../bar/" + formattedName + ".qml");
     }

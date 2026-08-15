@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -35,7 +36,7 @@ ContentPage {
         }
     }
 
-    property var allWidgets: [
+    readonly property var builtinWidgets: [
         { id: "leftSidebarButton", name: Translation.tr("Left Sidebar Button"),  icon: "left_panel_open" },
         { id: "workspaces",        name: Translation.tr("Workspaces"),           icon: "steppers" },
         { id: "weatherBar",        name: Translation.tr("Weather"),              icon: "flare" },
@@ -57,6 +58,25 @@ ContentPage {
         { id: "launcherButton",     name: Translation.tr("Launcher Button"),     icon: "search" },
     ]
 
+    // Built-ins, plus one entry per `provides.barWidgets` of every enabled
+    // plugin. A plugin reusing a built-in id replaces it rather than duplicating
+    // it, matching how BarContent resolves widget urls.
+    readonly property var allWidgets: {
+        const list = page.builtinWidgets.slice()
+        for (const widget of PluginRegistry.barWidgets) {
+            const entry = {
+                id: widget.id,
+                name: widget.name ?? widget.id,
+                icon: widget.icon ?? "extension",
+                pluginId: widget.pluginId
+            }
+            const existing = list.findIndex(candidate => candidate.id === entry.id)
+            if (existing >= 0) list[existing] = entry
+            else list.push(entry)
+        }
+        return list
+    }
+
     function availableFor() {
         let used = [
             ...Config.options.bar.layouts.leftLayout,
@@ -66,6 +86,7 @@ ContentPage {
         const multipleAllowed = ["visualizer", "divisor"]
         return allWidgets.filter(w => {
             if (w.id === "divisor" && Config.options.bar.borderless !== "transparent") return false
+            if (PluginRegistry.barWidget(w.id)?.multipleAllowed) return true
             return !used.includes(w.id) || multipleAllowed.includes(w.id)
         })
     }

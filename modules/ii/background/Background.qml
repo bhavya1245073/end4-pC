@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -627,6 +628,20 @@ Variants {
                         scaledScreenWidth: bgRoot.screen.width
                         scaledScreenHeight: bgRoot.screen.height
                         wallpaperScale: 1
+                    }
+                }
+
+                // Desktop widgets contributed by plugins. They inherit
+                // PluginBackgroundWidget, which reads its geometry from the
+                // canvas, so there is nothing to inject here.
+                Repeater {
+                    model: PluginRegistry.desktopWidgets
+                    delegate: FadeLoader {
+                        required property var modelData
+                        shown: PluginConfig.widgetEnabled(modelData.pluginId, modelData.id, modelData.enabledByDefault !== false)
+                            && (Config.options.background.screenList.length === 0
+                                || Config.options.background.screenList.includes(bgRoot.screen.name))
+                        source: modelData.url
                     }
                 }
             }

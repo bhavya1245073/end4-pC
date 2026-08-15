@@ -90,6 +90,25 @@ hl.bind("SUPER + escape", hl.dsp.global("quickshell:settingsToggle"), {descripti
 
 ---
 
+## 🧩 Plugins
+
+Everything past the core shell is a plugin: one folder under `plugins/` with a
+`manifest.json` in it. Drop the folder in, restart the shell, and it appears
+under **Settings → Plugins** with a generated settings form, ready to toggle.
+No core file needs editing, so the fork stays mergeable with upstream.
+
+A plugin can contribute bar widgets, desktop widgets, panels, background
+services, launcher actions, keybinds and whole settings pages.
+
+```bash
+scripts/new-plugin.sh my-plugin     # scaffolds plugins/my-plugin/
+```
+
+See **[docs/PLUGINS.md](docs/PLUGINS.md)** for the full authoring guide, and
+`plugins/example-clock/` for a working reference that uses most of the API.
+
+---
+
 ## ❓ FAQ
 
 ### How do I see my keybinds?

@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Qt5Compat.GraphicalEffects
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.ii.settings.pages
@@ -73,6 +74,18 @@ Item {
         if (WM.compositor === "niri") {
                     list.push({ name: Translation.tr("Niri"), icon: "select_window_2", component: Qt.resolvedUrl("pages/NiriConfig.qml") })
                 }
+        // Pages contributed by plugins. Installed-but-disabled plugins keep
+        // their entry (greyed out) so that enabling one never reshuffles the
+        // list under the user's cursor.
+        for (const pluginPage of PluginRegistry.installedSettingsPages) {
+            list.push({
+                name: pluginPage.name ?? pluginPage.pluginName,
+                icon: pluginPage.icon ?? "extension",
+                component: pluginPage.url,
+                pluginId: pluginPage.pluginId
+            })
+        }
+        list.push({ name: Translation.tr("Plugins"), icon: "extension", component: Qt.resolvedUrl("pages/PluginsConfig.qml") })
         list.push({ name: Translation.tr("About"), icon: "info", component: Qt.resolvedUrl("pages/About.qml") })
         return list
     }
@@ -251,6 +264,9 @@ Item {
                                 required property var index
                                 required property var modelData
                                 toggled: root.currentPage === index && !root.showingProfile
+                                // Plugin pages stay listed while their plugin is
+                                // off, but can't be opened.
+                                enabled: !modelData.pluginId || PluginRegistry.isActive(modelData.pluginId)
                                 onPressed: {
                                     root.currentPage = index
                                     root.showingProfile = false
@@ -295,6 +311,12 @@ Item {
                             anchors.topMargin: isActive ? 0 : 12
 
                             onLoaded: {
+                                // Plugin pages may declare
+                                // `property string pluginId` to be told which
+                                // plugin they belong to.
+                                if (modelData.pluginId && item && item.pluginId !== undefined) {
+                                    item.pluginId = modelData.pluginId;
+                                }
                                 if (root.currentPage === index) {
                                     GlobalStates.currentPageInstance = item;
                                 }
