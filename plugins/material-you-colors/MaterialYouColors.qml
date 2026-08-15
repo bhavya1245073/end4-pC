@@ -25,6 +25,11 @@
 // no reason, or enabling the plugin leaves the session on the old palette until
 // the next wallpaper change.
 //
+// The comparison waits for `PluginConfig.loaded`. plugins.json is read
+// asynchronously, and before it arrives every setting reads as its manifest
+// default and the snapshot reads as absent - which looks exactly like "just
+// enabled" and would re-theme the session at every startup.
+//
 // Nothing here is Nix-specific; the binary comes from `runtimeDeps` in the
 // manifest.
 
@@ -81,12 +86,10 @@ Scope {
         applyProcess.running = true;
     }
 
-    Component.onCompleted: {
-        // `settings` and `snapshot` are already resolved here: both are plain
-        // property bindings over PluginConfig, which loads synchronously.
-        if (root.snapshot !== (root.settings[root.snapshotKey] ?? ""))
-            root.apply();
-    }
+    // Whether the settings differ from what the last successful run applied.
+    readonly property bool stale: root.snapshot !== (root.settings[root.snapshotKey] ?? "")
+
+    Component.onCompleted: debounce.restart()
 
     onSnapshotChanged: debounce.restart()
 
@@ -98,7 +101,16 @@ Scope {
 
         interval: 600
         onTriggered: {
-            if (root.snapshot !== (root.settings[root.snapshotKey] ?? ""))
+            // Re-arm rather than decide on defaults. If the user had this plugin
+            // switched off, PluginRegistry destroys this object as soon as
+            // plugins.json lands, and the timer never fires again - which is the
+            // correct outcome.
+            if (!PluginConfig.loaded) {
+                debounce.restart();
+                return;
+            }
+
+            if (root.stale)
                 root.apply();
         }
     }
@@ -145,7 +157,9 @@ Scope {
         function status(): string {
             if (root.busy)
                 return "applying";
-            return root.failed ? `failed: ${root.lastError}` : "ok";
+            if (root.failed)
+                return `failed: ${root.lastError}`;
+            return root.stale ? "stale" : "ok";
         }
     }
 }

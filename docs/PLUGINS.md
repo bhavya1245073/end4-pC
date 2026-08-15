@@ -160,6 +160,23 @@ readonly property var settings: PluginConfig.of("my-plugin")
 
 It's a plain property: bind to it and the UI follows changes live, with no reload.
 
+`plugins.json` is read asynchronously, so until `PluginConfig.loaded` turns true
+every setting reads as its manifest default. Binding is unaffected — the binding
+updates when the file lands. But if your plugin *acts* on a stored value rather
+than just displaying it, wait for it, or you will act on the defaults once at
+every startup:
+
+```qml
+Timer {
+    interval: 600
+    running: true
+    onTriggered: {
+        if (!PluginConfig.loaded) { restart(); return }
+        // ... now the stored values are real
+    }
+}
+```
+
 Writing is rarely needed (the GUI does it), but available:
 
 ```qml

@@ -33,6 +33,16 @@ Singleton {
     // Raw contents of plugins.json.
     property var data: ({})
 
+    // True once plugins.json has been read, or found to be absent or unreadable.
+    // Written only from this file.
+    //
+    // FileView loads asynchronously, so until this turns true every setting reads
+    // as its manifest default. Binding to a value is unaffected - the binding
+    // simply updates when the file lands - but a plugin that *acts* on its stored
+    // state has to wait, or it will act on the defaults once at every startup.
+    // See plugins/material-you-colors for the pattern.
+    property bool loaded: false
+
     // pluginId -> { key: value } with manifest defaults filled in.
     readonly property var effective: {
         const merged = ({});
@@ -196,6 +206,8 @@ Singleton {
     }
 
     function load() {
+        root.loaded = true;
+
         const raw = configFile.text();
         if (raw.trim().length === 0) {
             root.data = ({});
@@ -242,6 +254,11 @@ Singleton {
             this.reload();
         }
         onLoaded: root.load()
-        onLoadFailed: root.data = ({})
+        onLoadFailed: {
+            // No file yet is the normal state on a fresh install: every plugin
+            // starts on its manifest defaults.
+            root.loaded = true;
+            root.data = ({});
+        }
     }
 }
