@@ -289,10 +289,10 @@ PanelWindow {
             Config.options.screenSnip.savePath : "";
         var screenshotAction = root.getScreenshotAction();
         const command = ScreenshotAction.getCommand(
-            root.regionX * root.monitorScale, //
-            root.regionY * root.monitorScale, //
-            root.regionWidth * root.monitorScale,// 
-            root.regionHeight * root.monitorScale, //
+            (root.isRecording ? root.regionX : root.regionX * root.monitorScale), //
+            (root.isRecording ? root.regionY : root.regionY * root.monitorScale), //
+            (root.isRecording ? root.regionWidth : root.regionWidth * root.monitorScale), // 
+            (root.isRecording ? root.regionHeight : root.regionHeight * root.monitorScale), //
             root.screenshotPath, //
             screenshotAction, //
             screenshotDir
