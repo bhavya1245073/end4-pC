@@ -352,7 +352,7 @@ switch() {
     fi
 
     python3 "$SCRIPT_DIR/generate_colors_material.py" "${generate_colors_material_args[@]}" \
-        > "$output_scss"
+        > "$output_scss.tmp" && mv "$output_scss.tmp" "$output_scss" || { echo "[switchwall] color generation failed; keeping previous palette" >&2; rm -f "$output_scss.tmp"; }
     deactivate
 
     if [[ -z "$colors_lock_flag" ]]; then
