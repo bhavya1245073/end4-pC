@@ -148,7 +148,7 @@ Singleton {
         // Identity-stability counters. Misses climbing while nothing is being installed
         // means a derived list is churning and rebuilding its consumers.
         function lists(): string {
-            const text = `[perf] stable hits=${Stable.hits} misses=${Stable.misses}`;
+            const text = `[perf] stable hits=${Stable.hits()} misses=${Stable.misses()}`;
             console.log(text);
             return text;
         }

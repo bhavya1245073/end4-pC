@@ -89,7 +89,7 @@ Item {
     // A plugin appearing on disk at runtime gets warmed too, once the burst settles.
     Connections {
         target: PluginRegistry
-        function onInstalledCacheKeyChanged() {
+        function onInstalledKeyChanged() {
             rewarm.restart();
         }
     }

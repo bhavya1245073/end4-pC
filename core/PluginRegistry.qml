@@ -14,6 +14,7 @@ import QtQml
 import Quickshell
 import Qt.labs.folderlistmodel
 import qs.services
+import "Memo.js" as Memo
 
 Singleton {
     id: root
@@ -71,10 +72,6 @@ Singleton {
 
     readonly property var active: root.all.filter(plugin => root.activeSet[plugin.id] === true)
 
-    // Bumped whenever anything the `collect` lists are derived from changes. Used as the
-    // memo key below.
-    readonly property int generation: root.active.length + Object.keys(root.plugins).length * 1000
-
     readonly property var panels: root.collect("panels")
     readonly property var services: root.collect("services")
     readonly property var barWidgets: root.collect("barWidgets")
@@ -102,23 +99,14 @@ Singleton {
     // Same memo as `collect`, over installed plugins rather than active ones. Keyed on
     // the plugin table, which changes only when a plugin appears or disappears on disk -
     // so these lists keep their identity across a toggle, which is the whole reason they
-    // exist. See the note above.
-    property var installedCache: ({})
-    property var installedCacheKey: ""
-
+    // exist. Computed from `plugins` rather than the `all` binding, for the coherence
+    // reason above.
     function collectInstalled(kind: string): var {
-        const key = Object.keys(root.plugins).sort().join(",");
-        if (root.installedCacheKey !== key) {
-            root.installedCacheKey = key;
-            root.installedCache = ({});
-        }
-        const hit = root.installedCache[kind];
-        if (hit !== undefined)
-            return hit;
-        const computed = root.collectFrom(root.all, kind);
-        root.installedCache[kind] = computed;
-        return computed;
+        return Memo.cached("installed", root.installedKey, kind, () => root.collectFrom(root.pluginsByName(Object.keys(root.plugins)), kind));
     }
+
+    // Changes only when a plugin appears or disappears on disk.
+    readonly property string installedKey: Object.keys(root.plugins).sort().join(",")
 
     // Sections a plugin injects into an existing settings page, rather than a whole
     // page of its own. This is what lets a plugin's settings live next to the related
@@ -153,21 +141,29 @@ Singleton {
     // `sectionsFor`, and from three registries' `all` bindings, so without a cache the
     // same flatten-and-tag ran dozens of times for one toggle - each run allocating a
     // fresh array, whose new identity then invalidated whatever read it.
-    property var collectCache: ({})
-    property var collectCacheKey: ""
-
+    //
+    // Both the key and the value are derived from `plugins` and `activeIds` directly, and
+    // deliberately not from the `active` binding. `active` is recomputed *from*
+    // `activeIds`, so during the pass where `activeIds` has already changed and `active`
+    // has not, keying on one while computing from the other caches a result from before
+    // the change under the key from after it. That is permanent: the key never changes
+    // again, so the stale value is returned forever. It shipped as zero plugin panels.
+    //
+    // The cache lives in Memo.js rather than in properties here: a memo reads what it
+    // writes, and doing that with QML properties inside a binding is a dependency cycle.
+    // Written the obvious way it produced "Binding loop detected for property panels"
+    // and Qt dropped the binding.
     function collect(kind: string): var {
-        const key = `${root.generation}:${root.activeIds.join(",")}`;
-        if (root.collectCacheKey !== key) {
-            root.collectCacheKey = key;
-            root.collectCache = ({});
-        }
-        const hit = root.collectCache[kind];
-        if (hit !== undefined)
-            return hit;
-        const computed = root.collectFrom(root.active, kind);
-        root.collectCache[kind] = computed;
-        return computed;
+        return Memo.cached("active", `${root.installedKey}|${root.activeIds.join(",")}`, kind, () => root.collectFrom(root.pluginsByName(root.activeIds), kind));
+    }
+
+    // Descriptors for a list of ids, in the same name order as `all`, skipping ids with
+    // no descriptor.
+    function pluginsByName(ids: var): var {
+        return ids
+            .map(id => root.plugins[id])
+            .filter(plugin => plugin !== undefined)
+            .sort((a, b) => a.name.localeCompare(b.name));
     }
 
     function collectFrom(plugins: var, kind: string): var {

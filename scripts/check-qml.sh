@@ -491,4 +491,164 @@ if [[ "$*" == "." ]] && command -v jq >/dev/null 2>&1; then
     fi
 fi
 
+# ---------------------------------------------------------------------------- phase 6
+#
+# Runtime: binding loops, and the memo invariant.
+#
+# Everything above is static, and static checking has a blind spot the size of this
+# phase. Two bugs got through all five: memo caches held in QML properties, which read
+# what they write and so form a dependency cycle - Qt reports "Binding loop detected",
+# drops a binding, and the property silently stops updating; and a cache keyed on
+# `activeIds` while computing from `active`, which is derived *from* activeIds and so lags
+# it by one evaluation, permanently caching an empty result under the final key. Both
+# compiled cleanly. The second shipped as zero plugin panels.
+#
+# The invariant is config-independent: a memoised list must equal the same list computed
+# from scratch. The window is `visible: false` - a visible PanelWindow here paints
+# layer-shell surfaces over the user's desktop.
+
+if [[ "$*" == "." ]] && command -v qs >/dev/null 2>&1; then
+    echo "==> Runtime: binding loops and cache coherence..."
+
+    runtimeProbe="$ROOT/.qml-check-runtime.qml"
+    runtimeLog="$(mktemp)"
+    trap 'rm -f "$HARNESS" "$runtimeProbe" "$runtimeLog"' EXIT
+
+    cat > "$runtimeProbe" <<'PROBE'
+import QtQuick
+import Quickshell
+import qs.core
+import qs.modules.common
+import qs.modules.common.widgets
+import qs.modules.common.widgets.widgetCanvas
+
+Scope {
+    id: root
+
+    PluginModuleAnchors {}
+    PluginHost {}
+    Component.onCompleted: PluginRegistry.discovered
+
+    // The consumers that bind to the registries, so their bindings get exercised.
+    PanelWindow {
+        visible: false
+        implicitWidth: 1920
+        implicitHeight: 1080
+        Loader { source: Qt.resolvedUrl("modules/ii/bar/BarContent.qml"); width: 1920; height: 40 }
+        Loader { source: Qt.resolvedUrl("modules/ii/sidebarRight/quickToggles/AndroidQuickPanel.qml") }
+        Loader { source: Qt.resolvedUrl("modules/ii/sidebarRight/quickToggles/ClassicQuickPanel.qml") }
+        WidgetCanvas {
+            width: 1920
+            height: 1080
+            Repeater {
+                model: DesktopWidgetRegistry.all
+                delegate: Loader {
+                    required property var modelData
+                    asynchronous: true
+                    source: modelData.url
+                }
+            }
+        }
+    }
+
+    // Sampled repeatedly through startup rather than once at the end. The coherence bug
+    // this exists to catch is a startup race - a memo populated during the window where
+    // `activeIds` has been recomputed and `plugins` has not - and it cannot be staged
+    // synthetically, because assigning either property re-derives the other. Sampling
+    // across the window catches it where it happens, and a mismatch still present on the
+    // final sample is a permanently poisoned cache, which is the bug.
+    property int samples: 0
+    property int lastBad: -1
+
+    function invariant(): int {
+        let bad = 0;
+        const kinds = ["panels", "services", "barWidgets", "desktopWidgets",
+                       "launcherActions", "shortcuts", "quickToggles",
+                       "settingsSections", "settingsPages"];
+
+        const activePlugins = PluginRegistry.pluginsByName(PluginRegistry.activeIds);
+        const allPlugins = PluginRegistry.pluginsByName(Object.keys(PluginRegistry.plugins));
+        for (const kind of kinds) {
+            const memo = PluginRegistry.collect(kind).length;
+            const fresh = PluginRegistry.collectFrom(activePlugins, kind).length;
+            if (memo !== fresh) {
+                console.log(`RUNTIME|SAMPLE${root.samples} collect("${kind}") memo=${memo} fresh=${fresh}`);
+                bad++;
+            }
+            const memoInstalled = PluginRegistry.collectInstalled(kind).length;
+            const freshInstalled = PluginRegistry.collectFrom(allPlugins, kind).length;
+            if (memoInstalled !== freshInstalled) {
+                console.log(`RUNTIME|SAMPLE${root.samples} collectInstalled("${kind}") memo=${memoInstalled} fresh=${freshInstalled}`);
+                bad++;
+            }
+        }
+        return bad;
+    }
+
+    Timer {
+        interval: 900
+        repeat: true
+        running: true
+        onTriggered: {
+            root.samples++;
+            root.lastBad = root.invariant();
+            if (root.samples < 14)
+                return;
+
+            this.stop();
+            let bad = root.lastBad;
+            if (bad > 0)
+                console.log(`RUNTIME|MISMATCH ${bad} memoised list(s) disagree with a fresh computation`);
+
+            // The registries must resolve their built-ins at minimum.
+            if (BarWidgetRegistry.all.length === 0) { console.log("RUNTIME|MISMATCH BarWidgetRegistry.all is empty"); bad++; }
+            if (DesktopWidgetRegistry.all.length === 0) { console.log("RUNTIME|MISMATCH DesktopWidgetRegistry.all is empty"); bad++; }
+            if (QuickToggleRegistry.availableFor("android").length === 0) { console.log("RUNTIME|MISMATCH QuickToggleRegistry android is empty"); bad++; }
+
+            // A settings bag must exist for every installed plugin that declares settings.
+            for (const plugin of PluginRegistry.all) {
+                if (plugin.settings.length > 0 && PluginConfig.of(plugin.id) === PluginConfig.emptyBag) {
+                    console.log(`RUNTIME|MISMATCH ${plugin.id} has no settings bag`);
+                    bad++;
+                }
+            }
+
+            console.log(`RUNTIME|mismatches=${bad} after ${root.samples} samples`);
+            console.log("RUNTIME|DONE");
+            Qt.quit();
+        }
+    }
+}
+PROBE
+
+    timeout 120 qs -p "$runtimeProbe" >"$runtimeLog" 2>&1 || true
+    sed -i 's/\x1b\[[0-9;]*m//g' "$runtimeLog"
+
+    runtime_failures=0
+
+    if ! grep -q 'RUNTIME|DONE' "$runtimeLog"; then
+        echo "    the runtime probe did not finish - see below"
+        tail -20 "$runtimeLog" | sed 's/^/      /'
+        runtime_failures=$(( runtime_failures + 1 ))
+    fi
+
+    if grep -q 'Binding loop detected' "$runtimeLog"; then
+        echo "==> Binding loops (Qt drops a binding, so the property stops updating):"
+        grep -A2 'Binding loop detected' "$runtimeLog" | grep -oE '(property "[a-zA-Z]+"|qs:@[^ ]+)' | sort -u | sed 's/^/    /'
+        runtime_failures=$(( runtime_failures + 1 ))
+    fi
+
+    if grep -q 'RUNTIME|MISMATCH' "$runtimeLog"; then
+        echo "==> Cache coherence failures:"
+        grep -oE 'RUNTIME\|MISMATCH.*' "$runtimeLog" | sed 's/RUNTIME|MISMATCH/   /' | sort -u
+        runtime_failures=$(( runtime_failures + 1 ))
+    fi
+
+    if (( runtime_failures )); then
+        status=1
+    else
+        echo "==> Runtime: no binding loops, memoised lists agree with fresh ones"
+    fi
+fi
+
 exit "$status"
