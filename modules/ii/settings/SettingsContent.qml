@@ -52,6 +52,8 @@ Item {
     }
 
     onCurrentPageChanged: {
+        navScroll.revealCurrent()
+
         const pageName = root.pages[currentPage]?.name ?? ""
         if (pageName === Translation.tr("About")) {
             if (SystemInfo.cpu === "") SystemInfo.refresh()
@@ -116,7 +118,12 @@ Item {
                 id: navRailWrapper
                 Layout.fillHeight: true
                 Layout.margins: 0
-                implicitWidth: navRail.expanded ? 195 : fab.baseSize
+                // Collapsed, the rail is only the icon column. It used to be
+                // fab.baseSize wide with that column inset 20px inside it, so the
+                // icons and the 48px avatar overflowed the panel edge by 10-20px.
+                // The gutter is computed now, so they sit centred instead.
+                readonly property real railWidth: isMinimal ? 48 : fab.baseSize
+                implicitWidth: navRail.expanded ? 195 : navRailWrapper.railWidth + 16
                 color: isMinimal ? "transparent" : Appearance.m3colors.m3surfaceContainerLow
                 radius: Appearance.rounding.normal
 
@@ -126,7 +133,12 @@ Item {
 
                 NavigationRail {
                     id: navRail
-                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom; leftMargin: 20 }
+                    anchors {
+                        left: parent.left
+                        top: parent.top
+                        bottom: parent.bottom
+                        leftMargin: navRail.expanded ? 20 : Math.max(0, (navRailWrapper.width - navRail.width) / 2)
+                    }
                     spacing: 10
                     expanded: root.width > 900
 
@@ -136,7 +148,6 @@ Item {
                         Layout.fillWidth: true
                         Layout.margins: isMinimal ? 0 : 5
                         Layout.topMargin: 15
-                        Layout.bottomMargin: isMinimal ? -30 : 0
 
                         Rectangle {
                             id: avatarRect
@@ -206,17 +217,22 @@ Item {
                             }
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
+                        // Handlers, not a MouseArea: a MouseArea is an Item, so as a
+                        // child of this RowLayout the layout tried to give it a cell
+                        // while it tried to anchors.fill the row. Handlers attach to
+                        // the row without being laid out.
+                        TapHandler {
+                            onTapped: root.showingProfile = !root.showingProfile
+                        }
+
+                        HoverHandler {
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.showingProfile = !root.showingProfile
                         }
                     }
 
                     Rectangle {
                         Layout.preferredWidth: isMinimal ? 50 : 160
-                        Layout.topMargin: isMinimal ? 30 : -5
-                        Layout.bottomMargin: isMinimal ? -30 : 0
+                        Layout.topMargin: isMinimal ? 0 : -5
                         height: 2
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
@@ -254,28 +270,64 @@ Item {
                         }
                     }
 
-                    NavigationRailTabArray {
-                        currentIndex: root.currentPage
-                        expanded: navRail.expanded
-                        colToggled: root.showingProfile ? "transparent" : Appearance.colors.colSecondaryContainer
-                        Repeater {
-                            model: root.pages
-                            NavigationRailButton {
-                                required property var index
-                                required property var modelData
-                                toggled: root.currentPage === index && !root.showingProfile
-                                // Plugin pages stay listed while their plugin is
-                                // off, but can't be opened.
-                                enabled: !modelData.pluginId || PluginRegistry.isActive(modelData.pluginId)
-                                onPressed: {
-                                    root.currentPage = index
-                                    root.showingProfile = false
+                    // Every plugin that contributes a settings page adds an entry
+                    // here, and the rail has a fixed pitch, so past a certain count
+                    // the last items used to fall off the bottom of the window with
+                    // no way to reach them. Give the list the leftover height and
+                    // let it scroll when it needs to.
+                    Flickable {
+                        id: navScroll
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        Layout.topMargin: 25
+
+                        implicitWidth: navTabs.implicitWidth
+                        contentWidth: width
+                        contentHeight: navTabs.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        interactive: contentHeight > height
+
+                        // Selecting a page from anywhere (the search bar can) must
+                        // not leave the highlight parked out of sight.
+                        function revealCurrent() {
+                            const pitch = navTabs.implicitHeight / Math.max(1, root.pages.length);
+                            const top = pitch * root.currentPage;
+
+                            if (top < navScroll.contentY)
+                                navScroll.contentY = top;
+                            else if (top + pitch > navScroll.contentY + navScroll.height)
+                                navScroll.contentY = top + pitch - navScroll.height;
+                        }
+
+                        NavigationRailTabArray {
+                            id: navTabs
+
+                            width: navScroll.width
+                            height: implicitHeight
+                            currentIndex: root.currentPage
+                            expanded: navRail.expanded
+                            colToggled: root.showingProfile ? "transparent" : Appearance.colors.colSecondaryContainer
+                            Repeater {
+                                model: root.pages
+                                NavigationRailButton {
+                                    required property var index
+                                    required property var modelData
+                                    toggled: root.currentPage === index && !root.showingProfile
+                                    // Plugin pages stay listed while their plugin is
+                                    // off, but can't be opened.
+                                    enabled: !modelData.pluginId || PluginRegistry.isActive(modelData.pluginId)
+                                    onPressed: {
+                                        root.currentPage = index
+                                        root.showingProfile = false
+                                    }
+                                    expanded: navRail.expanded
+                                    buttonIcon: modelData.icon
+                                    buttonIconRotation: modelData.iconRotation || 0
+                                    buttonText: modelData.name
+                                    showToggledHighlight: false
                                 }
-                                expanded: navRail.expanded
-                                buttonIcon: modelData.icon
-                                buttonIconRotation: modelData.iconRotation || 0
-                                buttonText: modelData.name
-                                showToggledHighlight: false
                             }
                         }
                     }

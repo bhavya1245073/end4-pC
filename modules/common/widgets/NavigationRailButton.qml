@@ -14,7 +14,12 @@ TabButton {
     property string buttonText
     property bool expanded: false
     property bool showToggledHighlight: true
-    readonly property real visualWidth: root.expanded ? root.baseSize + 20 + itemText.implicitWidth : root.baseSize
+
+    // The "minimal" settings style drops the labels. Nothing then says what the
+    // icons mean, so the label becomes a tooltip rather than disappearing.
+    readonly property bool showLabel: Config.options.settings.style !== "minimal"
+
+    readonly property real visualWidth: (root.expanded && root.showLabel) ? root.baseSize + 20 + itemText.implicitWidth : root.baseSize
 
     property real baseSize: Config.options.settings.style === "minimal" ? 46 : 56
     property real baseHighlightHeight: 32
@@ -29,6 +34,11 @@ TabButton {
 
     background: null
     PointingHandInteraction {}
+
+    StyledToolTip {
+        text: root.buttonText
+        extraVisibleCondition: !root.showLabel && root.buttonText !== ""
+    }
 
     // Real stuff
     contentItem: Item {
@@ -116,7 +126,7 @@ TabButton {
 
         StyledText {
             id: itemText
-            visible: Config.options.settings.style !== "minimal"
+            visible: root.showLabel
             anchors {
                 top: itemIconBackground.bottom
                 topMargin: 2

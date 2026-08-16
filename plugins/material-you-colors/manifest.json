@@ -35,7 +35,7 @@
       "max": 6,
       "step": 1,
       "label": "Wallpaper colour to theme from",
-      "description": "The wallpaper is scored down to seven colours, best first. 0 is the one the shell itself uses; raise it to theme KDE from a different colour in the same image.",
+      "description": "Which of the wallpaper's colours to use. 0 is the shell's own.",
       "icon": "colorize"
     },
     {
@@ -55,7 +55,7 @@
       "min": 0,
       "max": 3,
       "label": "Saturation",
-      "description": "Multiplies the colourfulness of every role. 1 is unchanged, 0 is grey.",
+      "description": "1 is unchanged, 0 is grey.",
       "icon": "water_drop"
     },
     {
@@ -65,7 +65,7 @@
       "min": 0,
       "max": 3,
       "label": "Lightness",
-      "description": "Multiplies the lightness of every role. 1 is unchanged.",
+      "description": "1 is unchanged.",
       "icon": "brightness_6"
     },
     {
@@ -75,8 +75,9 @@
       "min": 0,
       "max": 1,
       "label": "Frame contrast",
-      "description": "How visible the borders between panes are in Qt apps.",
-      "icon": "border_outer"
+      "description": "Visibility of the borders between panes in Qt apps.",
+      "icon": "border_outer",
+      "group": "Qt apps"
     },
     {
       "key": "toolbarOpacity",
@@ -86,8 +87,8 @@
       "max": 100,
       "step": 5,
       "label": "Toolbar opacity, light",
-      "description": "Applied to the window chrome of Qt apps in the light scheme.",
-      "icon": "opacity"
+      "icon": "opacity",
+      "group": "Qt apps"
     },
     {
       "key": "toolbarOpacityDark",
@@ -97,15 +98,17 @@
       "max": 100,
       "step": 5,
       "label": "Toolbar opacity, dark",
-      "icon": "opacity"
+      "icon": "opacity",
+      "group": "Qt apps"
     },
     {
       "key": "terminal",
       "type": "bool",
       "default": true,
       "label": "Theme terminals",
-      "description": "Writes foot's palette file and repaints open terminals, including the 256-colour slots the shell prompt uses. Turn this off to manage terminal colours yourself.",
-      "icon": "terminal"
+      "description": "Also repaints terminals that are already open.",
+      "icon": "terminal",
+      "group": "Terminals"
     },
     {
       "key": "pywal",
@@ -113,14 +116,15 @@
       "default": true,
       "label": "Write pywal files",
       "description": "~/.cache/wal/*, for anything that reads a pywal palette.",
-      "icon": "folder_data"
+      "icon": "folder_data",
+      "group": "Terminals"
     },
     {
       "key": "pywalMode",
       "type": "enum",
       "default": "auto",
       "label": "Terminal light/dark",
-      "description": "Terminals can stay dark while the rest of the session goes light.",
+      "description": "Terminals can stay dark while the session goes light.",
       "icon": "dark_mode",
       "options": [
         {
@@ -135,15 +139,17 @@
           "value": "light",
           "label": "Always light"
         }
-      ]
+      ],
+      "group": "Terminals"
     },
     {
       "key": "konsole",
       "type": "bool",
       "default": true,
       "label": "Theme Konsole",
-      "description": "Writes a Konsole colour scheme and switches open windows onto it.",
-      "icon": "terminal"
+      "description": "Also switches open windows onto it.",
+      "icon": "terminal",
+      "group": "Konsole"
     },
     {
       "key": "konsoleOpacity",
@@ -153,7 +159,8 @@
       "max": 100,
       "step": 5,
       "label": "Konsole opacity, light",
-      "icon": "opacity"
+      "icon": "opacity",
+      "group": "Konsole"
     },
     {
       "key": "konsoleOpacityDark",
@@ -163,30 +170,34 @@
       "max": 100,
       "step": 5,
       "label": "Konsole opacity, dark",
-      "icon": "opacity"
+      "icon": "opacity",
+      "group": "Konsole"
     },
     {
       "key": "konsoleBlur",
       "type": "bool",
       "default": false,
       "label": "Blur behind Konsole",
-      "icon": "blur_on"
+      "icon": "blur_on",
+      "group": "Konsole"
     },
     {
       "key": "decorations",
       "type": "bool",
       "default": true,
       "label": "Theme window decorations",
-      "description": "Breeze and Sierra Breeze Enhanced button colours, Klassy's outline, and KWin's rounded-corner outline. Each one is only touched if it is actually installed, so this does nothing under Hyprland alone.",
-      "icon": "window"
+      "description": "Breeze, Klassy and KWin outlines, where installed.",
+      "icon": "window",
+      "group": "Window decorations"
     },
     {
       "key": "titlebarOpacityEnable",
       "type": "bool",
       "default": false,
       "label": "Set titlebar opacity",
-      "description": "Off leaves Klassy and Sierra Breeze Enhanced's own opacity settings alone, which is different from setting them to 100%.",
-      "icon": "opacity"
+      "description": "Off leaves each decoration's own setting alone.",
+      "icon": "opacity",
+      "group": "Window decorations"
     },
     {
       "key": "titlebarOpacity",
@@ -196,7 +207,8 @@
       "max": 100,
       "step": 5,
       "label": "Titlebar opacity, light",
-      "icon": "opacity"
+      "icon": "opacity",
+      "group": "Window decorations"
     },
     {
       "key": "titlebarOpacityDark",
@@ -206,25 +218,28 @@
       "max": 100,
       "step": 5,
       "label": "Titlebar opacity, dark",
-      "icon": "opacity"
+      "icon": "opacity",
+      "group": "Window decorations"
     },
     {
       "key": "darkerWindowList",
       "type": "string",
       "default": "",
-      "label": "Darker titlebar for",
-      "description": "Space separated window classes that get a darker titlebar, via a KWin rule. Needs KWin.",
+      "label": "Darker titlebar",
+      "description": "Space separated window classes. Needs KWin.",
       "icon": "filter_alt",
-      "placeholder": "code foot"
+      "placeholder": "code foot",
+      "group": "Window decorations"
     },
     {
       "key": "onChangeHook",
       "type": "string",
       "default": "",
       "label": "Run after applying",
-      "description": "A shell command, run once the colours are on disk. $KDE_MATERIAL_YOU_JSON, $KDE_MATERIAL_YOU_MODE and $KDE_MATERIAL_YOU_SCHEME are set for it.",
+      "description": "Shell command, run once the colours are written.",
       "icon": "terminal",
-      "placeholder": "notify-send 'Theme applied'"
+      "placeholder": "notify-send 'Theme applied'",
+      "group": "Advanced"
     }
   ]
 }
