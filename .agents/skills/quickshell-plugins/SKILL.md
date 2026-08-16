@@ -6,12 +6,52 @@ compatibility: Needs a Wayland session to run scripts/check-qml.sh (Quickshell w
 
 # Quickshell plugins (end4-pC)
 
-A plugin is **one folder** under `plugins/` with a `manifest.json`. Nothing else
-installs it: no core file to edit, no import to register, no Nix change.
+A plugin is **one folder** with a `manifest.json`. Nothing else installs it: no
+core file to edit, no import to register, no Nix change.
 
 Work from this document. The tree is ~565 QML files and reading it to answer
 "what colour should this text be" is how you end up with a widget that is
 invisible in light mode.
+
+## Where to put it — decide this first
+
+Two trees can hold plugins, and picking the wrong one costs a
+commit-push-flake-bump cycle on every iteration.
+
+| Put it here | When | Install step |
+| --- | --- | --- |
+| `~/nixos-pc/modules/home/quickshell/plugins/<id>/` | **anything personal to this machine** — the default answer | drop the folder, `rebuild` |
+| `~/Projects/end4-pC/plugins/<id>/` | it belongs to the shell itself and should ship with the fork | commit, push, `nix flake update end4-pc`, `rebuild` |
+
+The NixOS config auto-discovers every folder under
+`modules/home/quickshell/plugins/` that holds a `manifest.json` and copies it in
+beside the shell's own. There is **no Nix to write** — no `programs.end4.plugins`
+entry, no module edit. Scaffold one:
+
+```bash
+cd ~/nixos-pc
+./scripts/new-plugin.sh weather-pill                        # bar widget
+./scripts/new-plugin.sh weather-pill --kind desktopWidget   # desktop widget
+rebuild
+```
+
+**Flakes only see git-tracked files.** An untracked plugin folder evaluates to
+nothing, installs nothing and reports no error — the plugin simply is not there.
+`new-plugin.sh` runs `git add -N` for you; by hand, do it yourself:
+
+```bash
+git -C ~/nixos-pc add -N modules/home/quickshell/plugins/weather-pill
+```
+
+A local plugin shadows a fork plugin of the same name, which is how to iterate on
+a shipped one without touching the fork. `programs.end4.plugins = { x = /abs/path; }`
+still exists, but only for a plugin living somewhere else entirely.
+
+Working local example: `modules/home/quickshell/plugins/quote-of-the-day/` — bar
+widget, desktop widget, an `ipc` target, two shortcuts, a plugin-local singleton,
+a `.js` data file and 8 settings.
+
+Everything below applies to both trees; only the install step differs.
 
 ## Orientation
 
@@ -27,6 +67,12 @@ invisible in light mode.
 | `scripts/check-icons.sh` | Material Symbol names vs the installed font |
 | `docs/PLUGINS.md` | the authoring guide this skill summarises |
 | `docs/ARCHITECTURE.md` | core vs plugin, the registries, the performance layer |
+
+Paths above are relative to the fork checkout (`~/Projects/end4-pC`). A plugin
+being developed in the NixOS config still imports `qs.core`, `qs.services` and
+the rest exactly the same way — it is copied into the same tree at build time — but
+`check-qml.sh` only sees what is in the fork, so verify a local plugin by
+rebuilding and reading `qs log` (see **Verify**).
 
 ## The 60-second plugin
 

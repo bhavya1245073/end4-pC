@@ -56,4 +56,11 @@ IpcHandler {
 
     // Handlers are only reachable while the plugin is on; the host binds this.
     enabled: true
+
+    // Registers with the shell so the same functions can be called *in-process* - by a
+    // context menu row, a quick toggle, another part of the shell - instead of only from
+    // the command line. Without this, anything inside the shell wanting to trigger a
+    // plugin action had to spawn `qs ipc call`, which is a process per click.
+    Component.onCompleted: PluginRegistry.registerIpc(root)
+    Component.onDestruction: PluginRegistry.unregisterIpc(root)
 }

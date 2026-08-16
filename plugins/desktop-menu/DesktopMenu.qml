@@ -8,6 +8,7 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Io
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -93,13 +94,31 @@ Scope {
             }
 
             property Component openSubmenuComponent: null
+            // A plugin's submenu arrives as a URL rather than a Component, since its QML
+            // lives outside this file and is not compiled into it.
+            property string openSubmenuUrl: ""
+
+            // Declared at window scope rather than inside the list: GroupedList's default
+            // property takes Items, and a Component is not one.
+            Component {
+                id: wallpaperSubmenu
+                WallpaperSubmenu {}
+            }
+
+            Component {
+                id: widgetsSubmenu
+                WidgetsSubmenu {}
+            }
             property real submenuAnchorY: 0
             property real submenuWidth: 284
 
             Timer {
                 id: submenuCloseTimer
                 interval: 250
-                onTriggered: menuWindow.openSubmenuComponent = null
+                onTriggered: {
+                    menuWindow.openSubmenuComponent = null
+                    menuWindow.openSubmenuUrl = ""
+                }
             }
 
             MouseArea {
@@ -162,146 +181,135 @@ Scope {
                         }
                     }
 
+                    // Every row in this menu, built-in and plugin alike, comes from
+                    // ContextMenuRegistry - so a plugin can add an item and place it
+                    // *between* built-in rows with `order`, rather than being appended
+                    // after them because the built-ins were hardcoded here.
+                    //
+                    // The built-in rows keep their bespoke behaviour (hover-opened
+                    // submenus with anchor maths, a live DropShelf count) through the
+                    // `builtin` field: a manifest can express an icon, a label and an
+                    // action, and those rows need more than that. Everything a manifest
+                    // *can* express is handled by the generic branch, which is what a
+                    // plugin row uses.
                     GroupedList {
                         Layout.fillWidth: true
                         itemVerticalPadding: 16
                         bgcolor: Appearance.colors.colLayer0
 
-                        // Wallpapers
-                        RippleButton {
-                            id: wallpaperRow
-                            implicitHeight: 40
-                            colBackground: "transparent"
-                            colBackgroundHover: Appearance.colors.colLayer2
-                            contentItem: RowLayout {
-                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                                spacing: 12
-                                MaterialSymbol { text: "format_paint"; iconSize: Appearance.font.pixelSize.larger; color: Appearance.colors.colOnLayer1 }
-                                StyledText { Layout.fillWidth: true; text: "Wallpaper & style"; font.pixelSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1 }
-                                MaterialSymbol { text: "chevron_right"; iconSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1; opacity: 0.4 }
-                            }
-                            Component {
-                                id: wallpaperSubmenu
-                                WallpaperSubmenu {}
-                            }
-                            HoverHandler {
-                                onHoveredChanged: {
-                                    if (hovered) {
-                                        submenuCloseTimer.stop()
-                                        menuWindow.submenuAnchorY = menuCard.y + wallpaperRow.mapToItem(menuCard, 0, 0).y
-                                        menuWindow.openSubmenuComponent = wallpaperSubmenu
-                                    } else {
-                                        submenuCloseTimer.restart()
+                        Repeater {
+                            model: ContextMenuRegistry.all
+
+                            delegate: RippleButton {
+                                id: menuRow
+
+                                required property var modelData
+
+                                readonly property string builtin: menuRow.modelData.builtin ?? ""
+                                readonly property bool opensSubmenu: menuRow.builtin === "wallpaper"
+                                    || menuRow.builtin === "widgets"
+                                    || (menuRow.modelData.url ?? "") !== ""
+
+                                implicitHeight: 40
+                                colBackground: "transparent"
+                                colBackgroundHover: Appearance.colors.colLayer2
+
+                                contentItem: RowLayout {
+                                    anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+                                    spacing: 12
+
+                                    MaterialSymbol {
+                                        text: menuRow.modelData.icon
+                                        iconSize: Appearance.font.pixelSize.larger
+                                        color: Appearance.colors.colOnLayer1
+                                    }
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: menuRow.modelData.label
+                                        font.pixelSize: Appearance.font.pixelSize.normal
+                                        color: Appearance.colors.colOnLayer1
+                                    }
+
+                                    // DropShelf shows how many items it is holding, and
+                                    // hides the chevron when it has some - the count is
+                                    // the more useful thing in the same space.
+                                    StyledText {
+                                        visible: menuRow.builtin === "dropshelf" && DropShelf.items.length > 0
+                                        text: DropShelf.items.length
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        color: Appearance.colors.colOnLayer1
+                                        opacity: 0.6
+                                    }
+
+                                    MaterialSymbol {
+                                        visible: menuRow.opensSubmenu
+                                            || (menuRow.builtin === "dropshelf" && DropShelf.items.length === 0)
+                                            || menuRow.builtin === "livewallpaper"
+                                            || menuRow.builtin === "settings"
+                                        text: "chevron_right"
+                                        iconSize: Appearance.font.pixelSize.normal
+                                        color: Appearance.colors.colOnLayer1
+                                        opacity: 0.4
                                     }
                                 }
-                            }
-                            onClicked: GlobalStates.desktopMenuOpen = false
-                        }
 
-                        // Widgets
-                        RippleButton {
-                            id: widgetsRow
-                            implicitHeight: 40
-                            colBackground: "transparent"
-                            colBackgroundHover: Appearance.colors.colLayer2
-                            contentItem: RowLayout {
-                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                                spacing: 12
-                                MaterialSymbol { text: "widgets"; iconSize: Appearance.font.pixelSize.larger; color: Appearance.colors.colOnLayer1 }
-                                StyledText { Layout.fillWidth: true; text: "Widgets"; font.pixelSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1 }
-                                MaterialSymbol { text: "chevron_right"; iconSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1; opacity: 0.4 }
-                            }
-
-                            Component {
-                                id: widgetsSubmenu
-                                WidgetsSubmenu {}
-                            }
-
-                            HoverHandler {
-                                onHoveredChanged: {
-                                    if (hovered) {
+                                HoverHandler {
+                                    enabled: menuRow.opensSubmenu
+                                    onHoveredChanged: {
+                                        if (!hovered) {
+                                            submenuCloseTimer.restart()
+                                            return
+                                        }
                                         submenuCloseTimer.stop()
-                                        menuWindow.submenuAnchorY = menuCard.y + widgetsRow.mapToItem(menuCard, 0, 0).y
-                                        menuWindow.openSubmenuComponent = widgetsSubmenu
-                                    } else {
-                                        submenuCloseTimer.restart()
+                                        menuWindow.submenuAnchorY = menuCard.y + menuRow.mapToItem(menuCard, 0, 0).y
+                                        if (menuRow.builtin === "wallpaper") {
+                                            menuWindow.openSubmenuUrl = ""
+                                            menuWindow.openSubmenuComponent = wallpaperSubmenu
+                                        } else if (menuRow.builtin === "widgets") {
+                                            menuWindow.openSubmenuUrl = ""
+                                            menuWindow.openSubmenuComponent = widgetsSubmenu
+                                        } else {
+                                            // A plugin submenu arrives as a URL, so it is
+                                            // loaded rather than referenced.
+                                            menuWindow.openSubmenuComponent = null
+                                            menuWindow.openSubmenuUrl = menuRow.modelData.url
+                                        }
                                     }
                                 }
-                            }
-                        }
 
-                        RippleButton {
-                            implicitHeight: 40
-                            colBackground: "transparent"
-                            colBackgroundHover: Appearance.colors.colLayer2
-                            contentItem: RowLayout {
-                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                                spacing: 12
-                                MaterialSymbol { text: "stacks"; iconSize: Appearance.font.pixelSize.larger; color: Appearance.colors.colOnLayer1 }
-                                StyledText { Layout.fillWidth: true; text: "DropShelf"; font.pixelSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1 }
-                                StyledText {
-                                    visible: DropShelf.items.length > 0
-                                    text: DropShelf.items.length
-                                    font.pixelSize: Appearance.font.pixelSize.small
-                                    color: Appearance.colors.colOnLayer1
-                                    opacity: 0.6
-                                }
-                                MaterialSymbol {
-                                    visible: DropShelf.items.length === 0
-                                    text: "chevron_right"
-                                    iconSize: Appearance.font.pixelSize.normal
-                                    color: Appearance.colors.colOnLayer1
-                                    opacity: 0.4
-                                }
-                            }
-                            onClicked: {
-                                GlobalStates.desktopMenuOpen = false
-                                GlobalStates.dropShelfX = GlobalStates.desktopMenuX
-                                GlobalStates.dropShelfY = GlobalStates.desktopMenuY
-                                GlobalStates.dropShelfOpen = true
-                            }
-                        }
+                                onClicked: {
+                                    switch (menuRow.builtin) {
+                                    case "wallpaper":
+                                    case "widgets":
+                                        // Hover already opened it; a click just dismisses.
+                                        GlobalStates.desktopMenuOpen = false
+                                        return
+                                    case "dropshelf":
+                                        GlobalStates.desktopMenuOpen = false
+                                        GlobalStates.dropShelfX = GlobalStates.desktopMenuX
+                                        GlobalStates.dropShelfY = GlobalStates.desktopMenuY
+                                        GlobalStates.dropShelfOpen = true
+                                        return
+                                    case "livewallpaper":
+                                        GlobalStates.desktopMenuOpen = false
+                                        Wallpapers.openFallbackPicker(
+                                            Appearance.m3colors.darkmode,
+                                            Config.options.wallpaperSelector.liveWallpapersPath ?? ""
+                                        )
+                                        return
+                                    case "settings":
+                                        GlobalStates.desktopMenuOpen = false
+                                        GlobalStates.settingsOpen = true
+                                        return
+                                    }
 
-                        RippleButton {
-                            implicitHeight: 40
-                            colBackground: "transparent"
-                            colBackgroundHover: Appearance.colors.colLayer2
-                            contentItem: RowLayout {
-                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                                spacing: 12
-                                MaterialSymbol { text: "video_template"; iconSize: Appearance.font.pixelSize.larger; color: Appearance.colors.colOnLayer1 }
-                                StyledText { Layout.fillWidth: true; text: "Live Wallpaper"; font.pixelSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1 }
-                                MaterialSymbol {
-                                    visible: DropShelf.items.length === 0
-                                    text: "chevron_right"
-                                    iconSize: Appearance.font.pixelSize.normal
-                                    color: Appearance.colors.colOnLayer1
-                                    opacity: 0.4
+                                    // Plugin row: ipc, exec, or a submenu that hover
+                                    // already opened. activate() returns false only for
+                                    // the submenu case, which should stay open.
+                                    if (ContextMenuRegistry.activate(menuRow.modelData))
+                                        GlobalStates.desktopMenuOpen = false
                                 }
-                            }
-                            onClicked: {
-                                GlobalStates.desktopMenuOpen = false
-                                Wallpapers.openFallbackPicker(
-                                    Appearance.m3colors.darkmode,
-                                    Config.options.wallpaperSelector.liveWallpapersPath ?? ""
-                                )
-                            }
-                        }
-
-                        RippleButton {
-                            implicitHeight: 40
-                            colBackground: "transparent"
-                            colBackgroundHover: Appearance.colors.colLayer2
-                            contentItem: RowLayout {
-                                anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
-                                spacing: 12
-                                MaterialSymbol { text: "settings"; iconSize: Appearance.font.pixelSize.larger; color: Appearance.colors.colOnLayer1 }
-                                StyledText { Layout.fillWidth: true; text: "Settings"; font.pixelSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1 }
-                                MaterialSymbol { text: "chevron_right"; iconSize: Appearance.font.pixelSize.normal; color: Appearance.colors.colOnLayer1; opacity: 0.4 }
-                            }
-                            onClicked: {
-                                GlobalStates.desktopMenuOpen = false
-                                GlobalStates.settingsOpen = true
                             }
                         }
                     }
@@ -311,9 +319,12 @@ Scope {
             // SubMenu
             Loader {
                 id: submenuLoader
-                active: menuWindow.openSubmenuComponent !== null
+                active: menuWindow.openSubmenuComponent !== null || menuWindow.openSubmenuUrl !== ""
                 width: menuWindow.submenuWidth
+                // Only one of these may be set at a time; a Loader with both a source and a
+                // sourceComponent is an error, so each is cleared when the other is used.
                 sourceComponent: menuWindow.openSubmenuComponent
+                source: menuWindow.openSubmenuComponent === null ? menuWindow.openSubmenuUrl : ""
 
                 x: (menuCard.x + menuCard.width + 8 + menuWindow.submenuWidth > menuWindow.width)
                     ? menuCard.x - menuWindow.submenuWidth - 8

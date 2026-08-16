@@ -1,45 +1,48 @@
-import qs.modules.common
-import qs.modules.common.widgets
-import qs.modules.common.functions
-import qs.services
-import qs
+// Draggable DropShelf Panel
+//
+// A floating, movable shelf for parking files and images between windows.
+// Supports native drag-in to park files, drag-out to other apps, and free window repositioning.
+
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import qs
+import qs.core
+import qs.services
+import qs.modules.common
+import qs.modules.common.widgets
+import qs.modules.common.functions
 
 PanelWindow {
     id: shelfRoot
+
     visible: GlobalStates.dropShelfOpen
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell:dropshelf"
     color: "transparent"
 
+    property real posX: Math.max(20, GlobalStates.dropShelfX - implicitWidth / 2)
+    property real posY: Math.max(20, GlobalStates.dropShelfY - implicitHeight - 30)
+
     anchors { top: true; left: true }
     margins {
-        left: Math.max(20, GlobalStates.dropShelfX - implicitWidth / 2)
-        top: Math.max(20, GlobalStates.dropShelfY - implicitHeight - 30)
+        left: shelfRoot.posX
+        top: shelfRoot.posY
     }
 
-    implicitWidth: 360
-    implicitHeight: contentColumn.implicitHeight + 24
+    implicitWidth: 420
+    implicitHeight: shelfBg.implicitHeight
 
-    DropArea {
-        anchors.fill: parent
-        keys: ["text/uri-list"]
-
-        onEntered: (drag) => {
-            drag.accepted = drag.hasUrls
-        }
-
-        onDropped: (drop) => {
-            if (!drop.hasUrls) {
-                drop.accepted = false
-                return
+    // Re-anchor to drop location on open
+    Connections {
+        target: GlobalStates
+        function onDropShelfOpenChanged() {
+            if (GlobalStates.dropShelfOpen) {
+                shelfRoot.posX = Math.max(20, Math.min(Screen.width - shelfRoot.implicitWidth - 20, GlobalStates.dropShelfX - shelfRoot.implicitWidth / 2));
+                shelfRoot.posY = Math.max(20, Math.min(Screen.height - shelfRoot.implicitHeight - 40, GlobalStates.dropShelfY - shelfRoot.implicitHeight - 30));
             }
-            DropShelf.addItems(drop.urls)
-            drop.accept()
         }
     }
 
@@ -47,196 +50,379 @@ PanelWindow {
         target: shelfBg
     }
 
+    // ── Outer Background & Drop Receiver ──────────────────────────────────────
     Rectangle {
         id: shelfBg
-        anchors.fill: parent
-        radius: Appearance.rounding.large
-        color: Appearance.colors.colLayer0
-        border.width: 1
-        border.color: Appearance.colors.colLayer0Border
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        implicitHeight: contentColumn.implicitHeight + (Theme.pad.l * 2)
+
+        radius: Theme.radius.l
+        color: Theme.solid
+        border.width: dropZone.containsDrag ? 2 : 1
+        border.color: dropZone.containsDrag ? Theme.accent : Theme.fade(Theme.outline, 0.5)
+
+        Behavior on border.color {
+            animation: Theme.anim.fast.colorAnimation.createObject(this)
+        }
+
+        // Single root DropArea for receiving files dragged into the shelf
+        DropArea {
+            id: dropZone
+            anchors.fill: parent
+            keys: ["text/uri-list"]
+
+            onEntered: (drag) => {
+                drag.accepted = drag.hasUrls;
+            }
+
+            onDropped: (drop) => {
+                if (!drop.hasUrls) {
+                    drop.accepted = false;
+                    return;
+                }
+                DropShelf.addItems(drop.urls);
+                drop.accept();
+            }
+        }
 
         ColumnLayout {
             id: contentColumn
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Theme.pad.l
+            spacing: Theme.pad.m
 
-            Carousel {
-                id: shelfCarousel
+            // ── Draggable Header Bar ──────────────────────────────────────────
+            Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 140
-                showCurrentIndicator: false
-                model: DropShelf.items
-                largeItemWidthRatio: 0.42
-                mediumItemWidthRatio: 0.28
-                smallItemWidthRatio: 0.12
+                implicitHeight: headerRow.implicitHeight
 
-                delegate: Loader {
-                    id: shelfItemLoader
-                    property string entryPath: modelData
-                    property real fixedWidth
-                    property real fixedHeight
-                    sourceComponent: /\.(png|jpe?g|webp|bmp|gif)$/i.test(shelfItemLoader.entryPath)
-                        ? imageDelegate
-                        : fileDelegate
+                // Drag handle area for moving the window across the screen
+                MouseArea {
+                    id: windowDragHandle
+                    anchors.fill: parent
+                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
 
-                    Component {
-                        id: imageDelegate
-                        Item {
+                    property real startX: 0
+                    property real startY: 0
+
+                    onPressed: (mouse) => {
+                        startX = mouse.x;
+                        startY = mouse.y;
+                    }
+
+                    onPositionChanged: (mouse) => {
+                        if (!pressed) return;
+                        var dx = mouse.x - startX;
+                        var dy = mouse.y - startY;
+                        shelfRoot.posX = Math.max(10, Math.min(Screen.width - shelfRoot.width - 10, shelfRoot.posX + dx));
+                        shelfRoot.posY = Math.max(10, Math.min(Screen.height - shelfRoot.height - 10, shelfRoot.posY + dy));
+                    }
+                }
+
+                RowLayout {
+                    id: headerRow
+                    anchors.fill: parent
+                    spacing: Theme.pad.s
+
+                    // Grip / Move Icon
+                    MaterialSymbol {
+                        text: "drag_indicator"
+                        iconSize: 18
+                        color: windowDragHandle.containsMouse ? Theme.accent : Theme.textDim
+                    }
+
+                    // Title
+                    StyledText {
+                        text: qsTr("Drop Shelf")
+                        font.pixelSize: Theme.font.m
+                        font.weight: Font.DemiBold
+                        color: Theme.text
+                    }
+
+                    // Count Badge
+                    Rectangle {
+                        visible: DropShelf.items.length > 0
+                        implicitHeight: 22
+                        implicitWidth: countText.implicitWidth + 14
+                        radius: Theme.radius.full
+                        color: Theme.accentMuted
+
+                        StyledText {
+                            id: countText
+                            anchors.centerIn: parent
+                            text: `${DropShelf.items.length}`
+                            font.pixelSize: Theme.font.xs
+                            font.weight: Font.DemiBold
+                            color: Theme.onAccentMuted
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    // Action Buttons
+                    RowLayout {
+                        spacing: Theme.pad.xs
+
+                        // Copy Button
+                        Rectangle {
+                            visible: DropShelf.items.length > 0
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            radius: Theme.radius.full
+                            color: copyHov.containsPress ? Theme.fade(Theme.accent, 0.25)
+                                 : copyHov.containsMouse ? Theme.fade(Theme.accent, 0.12)
+                                 : "transparent"
+
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "content_copy"
+                                iconSize: 15
+                                color: copyHov.containsMouse ? Theme.accent : Theme.textDim
+                            }
+                            HoverHandler { id: copyHov }
+                            TapHandler { onTapped: DropShelf.copyAll() }
+                        }
+
+                        // Clear Button
+                        Rectangle {
+                            visible: DropShelf.items.length > 0
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            radius: Theme.radius.full
+                            color: clearHov.containsPress ? Theme.fade(Theme.accent, 0.25)
+                                 : clearHov.containsMouse ? Theme.fade(Theme.accent, 0.12)
+                                 : "transparent"
+
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "delete_sweep"
+                                iconSize: 16
+                                color: clearHov.containsMouse ? Theme.accent : Theme.textDim
+                            }
+                            HoverHandler { id: clearHov }
+                            TapHandler { onTapped: DropShelf.clear() }
+                        }
+
+                        // Close Button
+                        Rectangle {
+                            implicitWidth: 28
+                            implicitHeight: 28
+                            radius: Theme.radius.full
+                            color: closeHov.containsPress ? Theme.fade(Theme.accent, 0.25)
+                                 : closeHov.containsMouse ? Theme.fade(Theme.accent, 0.12)
+                                 : "transparent"
+
+                            MaterialSymbol {
+                                anchors.centerIn: parent
+                                text: "close"
+                                iconSize: 16
+                                color: closeHov.containsMouse ? Theme.accent : Theme.textDim
+                            }
+                            HoverHandler { id: closeHov }
+                            TapHandler { onTapped: DropShelf.hide() }
+                        }
+                    }
+                }
+            }
+
+            // ── Parked Files Horizontal Shelf ─────────────────────────────────
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 120
+                visible: DropShelf.items.length > 0
+
+                ListView {
+                    id: fileListView
+                    anchors.fill: parent
+                    orientation: ListView.Horizontal
+                    spacing: 10
+                    clip: true
+                    model: DropShelf.items
+
+                    WheelHandler {
+                        target: fileListView
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: (event) => {
+                            if (event.angleDelta.y < 0 || event.angleDelta.x > 0)
+                                fileListView.flick(-400, 0);
+                            else
+                                fileListView.flick(400, 0);
+                        }
+                    }
+
+                    delegate: Item {
+                        id: cardDelegate
+                        required property string modelData
+                        required property int index
+
+                        width: 105
+                        height: 120
+
+                        readonly property string itemPath: modelData
+                        readonly property bool isImage: /\.(png|jpe?g|webp|bmp|gif|svg)$/i.test(itemPath)
+                        readonly property string fileName: itemPath.split("/").filter(Boolean).pop() || "file"
+
+                        // Drag payload for dragging OUT to external windows
+                        Drag.active: cardDragArea.drag.active
+                        Drag.dragType: Drag.Automatic
+                        Drag.mimeData: { "text/uri-list": "file://" + cardDelegate.itemPath }
+                        Drag.supportedActions: Qt.CopyAction
+
+                        Rectangle {
+                            id: cardBg
                             anchors.fill: parent
+                            radius: Theme.radius.m
+                            color: cardHover.containsMouse ? Theme.top : Theme.raised
+                            border.width: 1
+                            border.color: cardDragArea.drag.active ? Theme.accent : Theme.fade(Theme.outline, 0.4)
+                            clip: true
+
+                            Behavior on color {
+                                animation: Theme.anim.fast.colorAnimation.createObject(this)
+                            }
+
+                            // Image Thumbnail
                             StyledImage {
-                                id: shelfImg
-                                anchors.fill: parent
-                                source: "file://" + shelfItemLoader.entryPath
+                                visible: cardDelegate.isImage
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 80
+                                source: "file://" + cardDelegate.itemPath
                                 fillMode: Image.PreserveAspectCrop
                                 cache: true
                                 asynchronous: true
-
-                                Drag.active: dragArea.drag.active
-                                Drag.dragType: Drag.Automatic
-                                Drag.mimeData: { "text/uri-list": "file://" + shelfItemLoader.entryPath }
-                                Drag.supportedActions: Qt.CopyAction
-
-                                MouseArea {
-                                    id: dragArea
-                                    anchors.fill: parent
-                                    drag.target: parent
-                                    cursorShape: Qt.OpenHandCursor
-                                    onPressed: parent.grabToImage(() => {})
-                                    onReleased: {
-                                        if (parent.Drag.active) {
-                                            parent.Drag.drop()
-                                        }
-                                        parent.x = 0
-                                        parent.y = 0
-                                    }
-                                }
                             }
-                        }
-                    }
 
-                    Component {
-                        id: fileDelegate
-                        Item {
-                            anchors.fill: parent
-                            Rectangle {
-                                id: fileBg
-                                anchors.fill: parent
-                                color: Appearance.colors.colSurfaceContainerHighest
+                            // Non-Image File Icon
+                            Item {
+                                visible: !cardDelegate.isImage
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 80
 
-                                Drag.active: fileDragArea.drag.active
-                                Drag.dragType: Drag.Automatic
-                                Drag.mimeData: { "text/uri-list": "file://" + shelfItemLoader.entryPath }
-                                Drag.supportedActions: Qt.CopyAction
-
-                                ColumnLayout {
+                                MaterialSymbol {
                                     anchors.centerIn: parent
-                                    spacing: 4
-                                    MaterialSymbol {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        text: shelfItemLoader.entryPath.endsWith("/") ? "folder" : "draft"
-                                        iconSize: 32
-                                        color: Appearance.colors.colOnLayer1
-                                    }
-                                    StyledText {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        Layout.maximumWidth: 90
-                                        elide: Text.ElideMiddle
-                                        text: shelfItemLoader.entryPath.split("/").pop()
-                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                        color: Appearance.colors.colOnLayer1
-                                    }
+                                    text: cardDelegate.itemPath.endsWith("/") ? "folder" : "draft"
+                                    iconSize: 36
+                                    color: Theme.accent
+                                }
+                            }
+
+                            // File Name Caption
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                height: 40
+                                color: Theme.fade(Theme.solid, 0.85)
+
+                                StyledText {
+                                    anchors.fill: parent
+                                    anchors.margins: 4
+                                    text: cardDelegate.fileName
+                                    font.pixelSize: Theme.font.xs
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                    wrapMode: Text.WrapAnywhere
+                                    maximumLineCount: 2
+                                    elide: Text.ElideMiddle
+                                    color: Theme.text
+                                }
+                            }
+
+                            // Remove Item Button (hover badge)
+                            Rectangle {
+                                visible: cardHover.containsMouse
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.margins: 4
+                                width: 20
+                                height: 20
+                                radius: 10
+                                color: Theme.solid
+                                border.width: 1
+                                border.color: Theme.outlineDim
+
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "close"
+                                    iconSize: 12
+                                    color: removeTap.pressed ? Theme.error : Theme.textDim
                                 }
 
-                                MouseArea {
-                                    id: fileDragArea
-                                    anchors.fill: parent
-                                    drag.target: parent
-                                    cursorShape: Qt.OpenHandCursor
-                                    onReleased: {
-                                        if (parent.Drag.active) {
-                                            parent.Drag.drop()
+                                TapHandler {
+                                    id: removeTap
+                                    onTapped: {
+                                        DropShelf.items = DropShelf.items.filter((_, i) => i !== cardDelegate.index);
+                                        if (DropShelf.items.length === 0) {
+                                            DropShelf.hide();
                                         }
-                                        parent.x = 0
-                                        parent.y = 0
                                     }
                                 }
                             }
                         }
+
+                        // Card Interactive MouseArea for Dragging Out & Opening
+                        MouseArea {
+                            id: cardDragArea
+                            anchors.fill: parent
+                            drag.target: cardDelegate
+                            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+
+                            onPressed: {
+                                cardDelegate.grabToImage((result) => {
+                                    cardDelegate.Drag.imageSource = result.url;
+                                });
+                            }
+
+                            onReleased: {
+                                if (cardDelegate.Drag.active) {
+                                    cardDelegate.Drag.drop();
+                                }
+                                cardDelegate.x = 0;
+                                cardDelegate.y = 0;
+                            }
+
+                            onDoubleClicked: {
+                                Qt.openUrlExternally("file://" + cardDelegate.itemPath);
+                            }
+                        }
+
+                        HoverHandler {
+                            id: cardHover
+                        }
                     }
                 }
             }
 
-            StyledText {
-                Layout.alignment: Qt.AlignHCenter
-                text: Translation.tr("%1 elements").arg(DropShelf.items.length)
-                font.pixelSize: Appearance.font.pixelSize.normal
-                color: Appearance.colors.colOnLayer0
-            }
-
-            RowLayout {
+            // ── Empty State / Drop Hint ───────────────────────────────────────
+            Item {
                 Layout.fillWidth: true
-                Layout.topMargin: 4
-                spacing: 8
+                Layout.preferredHeight: 100
+                visible: DropShelf.items.length === 0
 
-                RippleButton {
-                    Layout.fillWidth: true
-                    implicitHeight: 40
-                    buttonRadius: height / 2
-                    colBackground: Appearance.colors.colSecondaryContainer
-                    colBackgroundHover: Appearance.colors.colSecondaryContainerHover
-                    onClicked: DropShelf.copyAll()
-                    contentItem: RowLayout {
-                        anchors.fill: parent
-                        spacing: 6
-                        StyledText {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            text: Translation.tr("Copy")
-                            color: Appearance.colors.colOnSecondaryContainer
-                        }
-                    }
-                }
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: Theme.pad.s
 
-                RippleButton {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignRight
-                    implicitHeight: 40
-                    buttonRadius: height / 2
-                    colBackground: Appearance.colors.colLayer1
-                    colBackgroundHover: Appearance.colors.colLayer1Hover
-                    onClicked: DropShelf.clear()
-                    contentItem: RowLayout {
-                        anchors.fill: parent
-                        spacing: 6
-                        StyledText {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            text: Translation.tr("Clear")
-                            color: Appearance.colors.colOnLayer1
-                        }
+                    MaterialSymbol {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: dropZone.containsDrag ? "download" : "move_to_inbox"
+                        iconSize: 36
+                        color: dropZone.containsDrag ? Theme.accent : Theme.textFaint
                     }
-                }
-                RippleButton {
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignRight
-                    implicitHeight: 40
-                    buttonRadius: height / 2
-                    colBackground: Appearance.colors.colLayer1
-                    colBackgroundHover: Appearance.colors.colLayer1Hover
-                    onClicked: DropShelf.hide()
-                    contentItem: RowLayout {
-                        anchors.fill: parent
-                        spacing: 6
-                        StyledText {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.fillWidth: true
-                            horizontalAlignment: Text.AlignHCenter
-                            text: Translation.tr("Close")
-                            color: Appearance.colors.colOnLayer1
-                        }
+
+                    StyledText {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: dropZone.containsDrag ? qsTr("Release to park files here") : qsTr("Drop files here to park them")
+                        font.pixelSize: Theme.font.s
+                        color: dropZone.containsDrag ? Theme.accent : Theme.textFaint
                     }
                 }
             }

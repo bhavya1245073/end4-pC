@@ -651,4 +651,99 @@ PROBE
     fi
 fi
 
+# ---------------------------------------------------------------------------- phase 7
+# `pragma Singleton` reachable by the scanner.
+#
+# Quickshell decides whether a file is a singleton by scanning it, and the scan stops at
+# the first `{` - **including one inside a comment**. So a header comment containing a
+# JSON example or an object literal, written above the pragma, makes the file not a
+# singleton. There is no error: the type still resolves, every property and function on it
+# reads as undefined, and the failure surfaces somewhere else entirely as
+#   "TypeError: Property 'show' of object OsdRegistry is not a function".
+#
+# Three files shipped like this in one sitting, so the rule is: `pragma Singleton` on line
+# one, above the header comment.
+
+singleton_failures=0
+singleton_count=0
+while IFS= read -r file; do
+    singleton_count=$(( singleton_count + 1 ))
+    verdict="$(awk '/^pragma Singleton/{p=NR} /\{/{if(!b)b=NR} END{print (p && p<b) ? "ok" : "broken"}' "$file")"
+    if [[ "$verdict" == "broken" ]]; then
+        brace_line="$(awk '/\{/{print NR; exit}' "$file")"
+        echo "FAIL ${file#./}"
+        echo "      a { on line $brace_line precedes 'pragma Singleton', so the scanner never sees it"
+        echo "      and every member of this singleton reads as undefined. Move the pragma to line 1."
+        singleton_failures=$(( singleton_failures + 1 ))
+    fi
+done < <(grep -rl "^pragma Singleton" --include='*.qml' "$@" 2>/dev/null | sort)
+if (( singleton_failures )); then
+    status=1
+else
+    echo "==> Singleton pragmas: all $singleton_count reachable by the scanner"
+fi
+
+# ---------------------------------------------------------------------------- phase 8
+# Manifests against core/manifest.schema.json.
+#
+# The schema is the plugin contract in machine-readable form: what a `provides` kind
+# accepts, which fields are required, what a setting may be. A manifest that violates it
+# usually still loads - the shell reads the fields it knows and ignores the rest - so the
+# failure shows up as a plugin that half works. This is also what caught a field the
+# schema itself had missed, since two real manifests used it.
+#
+# Skipped with a note when check-jsonschema is absent rather than failing: it is in
+# nixpkgs, but this script has to be runnable anywhere.
+
+if [[ $# -eq 0 || "$*" == "." ]]; then
+    manifests=()
+    while IFS= read -r m; do manifests+=("$m"); done < <(find "$ROOT/plugins" -mindepth 2 -maxdepth 2 -name manifest.json 2>/dev/null | sort)
+
+    # Plugins developed in the NixOS config run against this core, so they are checked
+    # against this schema too.
+    localPlugins="$HOME/nixos-pc/modules/home/quickshell/plugins"
+    if [[ -d "$localPlugins" ]]; then
+        while IFS= read -r m; do manifests+=("$m"); done < <(find "$localPlugins" -mindepth 2 -maxdepth 2 -name manifest.json 2>/dev/null | sort)
+    fi
+
+    if ! command -v check-jsonschema >/dev/null 2>&1; then
+        echo "==> Manifests: skipped, check-jsonschema not on PATH (it is in nixpkgs)"
+    elif (( ${#manifests[@]} == 0 )); then
+        echo "==> Manifests: none found"
+    else
+        schema_failures=0
+        for manifest in "${manifests[@]}"; do
+            if ! out="$(check-jsonschema --schemafile "$ROOT/core/manifest.schema.json" "$manifest" 2>&1)"; then
+                echo "FAIL ${manifest#"$ROOT/"}"
+                echo "$out" | grep -vE '^(Schema validation errors were encountered|ok)' | sed 's/^/      /'
+                schema_failures=$(( schema_failures + 1 ))
+            fi
+        done
+        if (( schema_failures )); then
+            status=1
+        else
+            echo "==> Manifests: all ${#manifests[@]} match the schema"
+        fi
+    fi
+fi
+
+# ---------------------------------------------------------------------------- phase 9
+# The API catalogue matches the code.
+#
+# core/api.json is what a plugin author - human or agent - is handed instead of reading
+# 590 files. A stale catalogue is worse than none, because it is trusted: it will happily
+# name a Theme token that was renamed, and the mistake looks like the author's.
+
+if [[ $# -eq 0 || "$*" == "." ]]; then
+    if [[ -x "$ROOT/scripts/gen-api.sh" ]]; then
+        if "$ROOT/scripts/gen-api.sh" --check >/dev/null 2>&1; then
+            echo "==> API catalogue: up to date"
+        else
+            echo "==> API catalogue is stale. Run scripts/gen-api.sh"
+            "$ROOT/scripts/gen-api.sh" --check 2>&1 | tail -12 | sed 's/^/    /'
+            status=1
+        fi
+    fi
+fi
+
 exit "$status"

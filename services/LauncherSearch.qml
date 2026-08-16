@@ -17,6 +17,10 @@ Singleton {
 
     property string query: ""
 
+    // Push every query into plugin providers. Imperative rather than a binding on their
+    // side because search can start a request or a process; see core/PluginSearch.qml.
+    onQueryChanged: PluginSearch.run(root.query)
+
     function ensurePrefix(prefix) {
         if ([Config.options.search.prefix.action, Config.options.search.prefix.app, Config.options.search.prefix.clipboard, Config.options.search.prefix.emojis, Config.options.search.prefix.symbols, Config.options.search.prefix.math, Config.options.search.prefix.shellCommand, Config.options.search.prefix.webSearch,].some(i => root.query.startsWith(i))) {
             root.query = prefix + root.query.slice(1);
@@ -145,6 +149,30 @@ Singleton {
         }
         return actions;
     }
+
+    // Rows from plugin search providers, converted into the model type the launcher's
+    // delegates expect. Plugins return plain objects - `{ name, subtitle, icon,
+    // onActivate }` - so a provider never has to know about LauncherSearchResult,
+    // createObject, or the IconType enum.
+    //
+    // Depends on PluginSearch.results, so an async provider answering late updates the
+    // list without another keystroke.
+    property var pluginSearchResults: PluginSearch.results.map(row => resultComp.createObject(null, {
+        name: row.name ?? "",
+        // The launcher shows `type` as the dim trailing label, which is where a
+        // provider's subtitle belongs.
+        type: row.subtitle ?? row.type ?? "",
+        comment: row.comment ?? "",
+        verb: row.verb ?? "",
+        iconName: row.icon ?? "extension",
+        iconType: row.iconIsApp === true ? LauncherSearchResult.IconType.System : LauncherSearchResult.IconType.Material,
+        execute: () => {
+            if (typeof row.onActivate === "function")
+                row.onActivate();
+            if (row.keepOpen !== true)
+                root.query = "";
+        }
+    }))
 
     property var searchActions: [
         {
@@ -535,6 +563,11 @@ Singleton {
 
         //////////////// Apps //////////////////
         result = result.concat(appResultObjects);
+        ////////// Plugin search providers //////
+        // Above apps: a provider that answered at all did so because it recognised the
+        // query, which is a stronger signal than a fuzzy name match. A provider that
+        // should not outrank apps sets a higher `order` and is sorted among the others.
+        result = root.pluginSearchResults.concat(result);
         ////////////// Settings ////////////////
         result = result.concat(settingsResults);
         ////////// Launcher actions ////////////

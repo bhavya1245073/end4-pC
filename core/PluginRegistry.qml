@@ -80,6 +80,9 @@ Singleton {
     readonly property var launcherActions: root.collect("launcherActions")
     readonly property var shortcuts: root.collect("shortcuts")
     readonly property var quickToggles: root.collect("quickToggles")
+    readonly property var searchProviders: root.collect("searchProviders")
+    readonly property var contextMenuItems: root.collect("contextMenuItems")
+    readonly property var osdIndicators: root.collect("osdIndicators")
 
     // The same lists over *installed* plugins, enabled or not.
     //
@@ -97,6 +100,9 @@ Singleton {
     readonly property var installedDesktopWidgets: root.collectInstalled("desktopWidgets")
     readonly property var installedBarWidgets: root.collectInstalled("barWidgets")
     readonly property var installedQuickToggles: root.collectInstalled("quickToggles")
+    readonly property var installedSearchProviders: root.collectInstalled("searchProviders")
+    readonly property var installedContextMenuItems: root.collectInstalled("contextMenuItems")
+    readonly property var installedOsdIndicators: root.collectInstalled("osdIndicators")
 
     // Same memo as `collect`, over installed plugins rather than active ones. Keyed on
     // the plugin table, which changes only when a plugin appears or disappears on disk -
@@ -227,6 +233,16 @@ Singleton {
 
     function setEnabled(pluginId: string, enabled: bool) {
         PluginConfig.setEnabled(pluginId, enabled);
+
+        // A bar widget nothing has placed is invisible, so a plugin whose only
+        // contribution is one used to switch on and appear to do nothing at all. If it
+        // declared a `zone`, put it there - once, on the first enable. See
+        // BarWidgetRegistry.autoPlace.
+        //
+        // Deferred because the widget's own settings write and this one would otherwise
+        // race through PluginConfig's write coalescing.
+        if (enabled)
+            Qt.callLater(() => BarWidgetRegistry.autoPlace(pluginId));
     }
 
     // Plugins may declare `requires.compositor: ["hyprland"]`, and are skipped
@@ -412,6 +428,49 @@ Singleton {
             required property string modelData
             pluginId: modelData
         }
+    }
+
+    // ------------------------------------------------- live IPC dispatch
+    //
+    // Plugin IPC targets are reachable from the command line through Quickshell's own
+    // IpcHandler machinery, but nothing in the shell could *call* one - so a context menu
+    // row or a quick toggle wanting to trigger a plugin action had to spawn
+    // `qs ipc call ...` and pay a process for it.
+    //
+    // Each PluginIpc registers itself here on completion. Keyed by target, which is the
+    // name the command line uses too, so one plugin action has exactly one name whether
+    // it is invoked from a menu, a keybind or a shell.
+    property var ipcTargets: ({})
+
+    function registerIpc(handler: var): void {
+        if (!handler?.target)
+            return;
+        const next = Object.assign({}, root.ipcTargets);
+        next[handler.target] = handler;
+        root.ipcTargets = next;
+    }
+
+    function unregisterIpc(handler: var): void {
+        if (!handler?.target || root.ipcTargets[handler.target] !== handler)
+            return;
+        const next = Object.assign({}, root.ipcTargets);
+        delete next[handler.target];
+        root.ipcTargets = next;
+    }
+
+    // Calls a plugin IPC function in-process. Returns false if the target, the function,
+    // or the plugin providing it is not there - callers report that rather than failing
+    // silently, because a typo in a manifest is otherwise invisible.
+    function invokeIpc(target: string, name: string, args: var): bool {
+        const handler = root.ipcTargets[target];
+        if (!handler || typeof handler[name] !== "function")
+            return false;
+        try {
+            handler[name].apply(handler, args ?? []);
+        } catch (e) {
+            console.warn(`[plugins] ipc ${target}.${name} threw:`, e);
+        }
+        return true;
     }
 
     Component.onCompleted: root.rescan()

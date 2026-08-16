@@ -1,4 +1,5 @@
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -15,30 +16,40 @@ Scope {
     property string protectionMessage: ""
     property var focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name)
 
-    property string currentIndicator: "volume"
-    property var indicators: [
-        {
-            id: "volume",
-            sourceUrl: "indicators/VolumeIndicator.qml"
-        },
-        {
-            id: "brightness",
-            sourceUrl: "indicators/BrightnessIndicator.qml"
-        },
-        {
-            id: "gamma",
-            sourceUrl: "indicators/GammaIndicator.qml"
-        },
-    ]
+    // Which indicator to show, and the list of them, both live in OsdRegistry - so a
+    // plugin can contribute a HUD of its own (`provides.osdIndicators`) and show it with
+    // `OsdRegistry.show("id")`. This panel owns the window, placement and timeout; an
+    // indicator only draws content.
+    readonly property string currentIndicator: OsdRegistry.current
 
-    function triggerOsd() {
+    // Built-in indicator paths are relative to this file, and a Loader resolves a
+    // relative source against the file it appears in - which is this one, wherever the
+    // registry happens to live.
+    Component.onCompleted: OsdRegistry.builtinBase = Qt.resolvedUrl(".").toString().replace(/\/$/, "")
+
+    Connections {
+        target: OsdRegistry
+
+        function onRequested(id, timeout) {
+            root.triggerOsd(timeout);
+        }
+    }
+
+    function triggerOsd(timeout) {
         GlobalStates.osdVolumeOpen = true;
+        // An indicator may ask for longer than the user's default - a pomodoro chime wants
+        // a few seconds, a volume nudge does not. Held in a property rather than assigned
+        // to the Timer, because assigning `interval` would break its binding to the
+        // configured value for the rest of the session.
+        root.timeoutOverride = timeout ?? 0;
         osdTimeout.restart();
     }
 
+    property int timeoutOverride: 0
+
     Timer {
         id: osdTimeout
-        interval: Config.options.osd.timeout
+        interval: root.timeoutOverride > 0 ? root.timeoutOverride : Config.options.osd.timeout
         repeat: false
         running: false
         onTriggered: {
@@ -51,8 +62,7 @@ Scope {
         target: Brightness
         function onBrightnessChanged() {
             root.protectionMessage = "";
-            root.currentIndicator = "brightness";
-            root.triggerOsd();
+            OsdRegistry.show("brightness");
         }
     }
 
@@ -60,8 +70,7 @@ Scope {
         target: Hyprsunset
         function onGammaChangeAttempt() {
             root.protectionMessage = "";
-            root.currentIndicator = "gamma";
-            root.triggerOsd();
+            OsdRegistry.show("gamma");
         }
     }
 
@@ -71,14 +80,12 @@ Scope {
         function onVolumeChanged() {
             if (!Audio.ready)
                 return;
-            root.currentIndicator = "volume";
-            root.triggerOsd();
+            OsdRegistry.show("volume");
         }
         function onMutedChanged() {
             if (!Audio.ready)
                 return;
-            root.currentIndicator = "volume";
-            root.triggerOsd();
+            OsdRegistry.show("volume");
         }
     }
 
@@ -87,8 +94,7 @@ Scope {
         target: Audio
         function onSinkProtectionTriggered(reason) {
             root.protectionMessage = reason;
-            root.currentIndicator = "volume";
-            root.triggerOsd();
+            OsdRegistry.show("volume");
         }
     }
 
@@ -156,7 +162,7 @@ Scope {
 
                         Loader {
                             id: osdIndicatorLoader
-                            source: root.indicators.find(i => i.id === root.currentIndicator)?.sourceUrl
+                            source: OsdRegistry.urlFor(root.currentIndicator)
                         }
 
                         Item {

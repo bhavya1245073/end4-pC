@@ -85,6 +85,11 @@ Singleton {
                 pill: w.materialPill !== false,
                 pillColor: w.pillColor ?? "primaryContainer",
                 repeatable: w.multipleAllowed === true,
+                // Where the widget would like to be placed the first time its plugin is
+                // switched on. Not a live binding to the layout: once placed, the user's
+                // arrangement is the truth. See autoPlace().
+                zone: w.zone ?? "",
+                zoneOrder: w.zoneOrder ?? 50,
             };
             const existing = list.findIndex(c => c.id === entry.id);
             if (existing >= 0)
@@ -127,5 +132,61 @@ Singleton {
 
     function pillColor(id: string): color {
         return Appearance.getColorFromName(root.find(id)?.pillColor ?? "primaryContainer");
+    }
+
+    // ------------------------------------------------------- automatic placement
+    //
+    // A bar widget that nothing has placed is invisible, so enabling a plugin used to do
+    // nothing observable: the user had to go to Settings -> Bar and drag the widget in,
+    // having first guessed that it existed. A manifest can now say where it belongs:
+    //
+    //     "barWidgets": [{ "id": "battery", "entry": "...", "zone": "right", "zoneOrder": 20 }]
+    //
+    // Placed once, the first time the plugin is enabled, and recorded in plugins.json so
+    // it is never placed again. That distinction matters: a user who removes the widget
+    // has made a decision, and re-adding it on the next shell start would be the shell
+    // arguing with them.
+    readonly property var zones: ({
+        left: "leftLayout",
+        center: "middleLayout",
+        middle: "middleLayout",
+        right: "rightLayout"
+    })
+
+    function autoPlace(pluginId: string): void {
+        for (const widget of root.all) {
+            if (widget.pluginId !== pluginId || !widget.zone)
+                continue;
+
+            const key = root.zones[widget.zone.toLowerCase()];
+            if (!key) {
+                console.warn(`[plugins] ${pluginId}: bar widget "${widget.id}" wants zone "${widget.zone}" - use left, center or right`);
+                continue;
+            }
+
+            // Already decided, either by us before or by the user.
+            if (PluginConfig.widgetValue(pluginId, widget.id, "placed", false) === true)
+                continue;
+            PluginConfig.setWidgetValue(pluginId, widget.id, "placed", true);
+
+            const layouts = Config.options.bar.layouts;
+            if (layouts[key].includes(widget.id))
+                continue;
+
+            // zoneOrder is relative to other *auto-placed* widgets, not to an absolute
+            // index: inserting at a fixed index would shove a user's own widgets around.
+            // Anything with a lower zoneOrder that is already present marks the spot.
+            const existing = layouts[key].slice();
+            let insertAt = existing.length;
+            for (let i = 0; i < existing.length; i++) {
+                const other = root.find(existing[i]);
+                if (other?.pluginId && (other.zoneOrder ?? 50) > widget.zoneOrder) {
+                    insertAt = i;
+                    break;
+                }
+            }
+            existing.splice(insertAt, 0, widget.id);
+            layouts[key] = existing;
+        }
     }
 }
