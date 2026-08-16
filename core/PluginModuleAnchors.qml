@@ -48,6 +48,8 @@ import qs.modules.ii.background.widgets.visualizer
 import qs.modules.ii.background.widgets.weather
 import qs.modules.ii.background.widgets.worldclock
 import qs.modules.ii.bar
+import qs.modules.ii.sidebarRight.quickToggles.androidStyle
+import qs.modules.ii.sidebarRight.quickToggles.classicStyle
 import qs.modules.ii.sidebarRight.volumeMixer
 import qs.services
 

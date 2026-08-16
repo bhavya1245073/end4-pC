@@ -1,3 +1,4 @@
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -25,15 +26,19 @@ AbstractQuickPanel {
     }
     readonly property real baseCellHeight: 56
 
-    readonly property list<string> availableToggleTypes: {
-        const base = ["network", "bluetooth", "idleInhibitor", "easyEffects", "nightLight", "darkMode", "cloudflareWarp", "gameMode", "screenSnip", "colorPicker", "onScreenKeyboard", "mic", "audio", "notifications", "powerProfile","musicRecognition", "antiFlashbang"]
-        return WM.compositor === "hyprland" ? base : base.filter(t => t !== "gameMode")
-    }
+    // From the registry, so a plugin's toggle turns up in the unused tray and can be
+    // dragged into the grid like any other. The compositor filter that used to be
+    // spelled out here (`gameMode` needs Hyprland) is now a `requires` field, so a
+    // plugin can say the same thing about its own toggle.
+    readonly property list<string> availableToggleTypes: QuickToggleRegistry.availableIds("android")
     readonly property int columns: Config.options.sidebar.quickToggles.android.columns
     readonly property list<var> toggles: {
         if (!Config.ready) return []
         const raw = Config.options.sidebar.quickToggles.android.toggles
-        return WM.compositor === "hyprland" ? raw : raw.filter(t => !t || t.type !== "gameMode")
+        // Drop saved entries whose toggle no longer resolves - an uninstalled plugin,
+        // or a built-in unavailable on this compositor.
+        const usable = QuickToggleRegistry.availableIds("android")
+        return raw.filter(t => t && usable.includes(t.type))
     }
     readonly property list<var> toggleRows: toggleRowsForList(toggles)
     readonly property list<var> unusedToggles: {
@@ -96,7 +101,7 @@ AbstractQuickPanel {
                             values: toggleRow?.modelData ?? []
                             objectProp: "type"
                         }
-                        delegate: AndroidToggleDelegateChooser {
+                        delegate: AndroidToggleDelegate {
                             startingIndex: toggleRow.startingIndex
                             editMode: root.editMode
                             gridRef: usedRows
@@ -178,7 +183,7 @@ AbstractQuickPanel {
                                 values: unusedToggleRow?.modelData ?? []
                                 objectProp: "type"
                             }
-                            delegate: AndroidToggleDelegateChooser {
+                            delegate: AndroidToggleDelegate {
                                 startingIndex: -1
                                 editMode: root.editMode
                                 isUnused: true

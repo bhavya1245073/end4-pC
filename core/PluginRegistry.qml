@@ -60,6 +60,7 @@ Singleton {
     readonly property var desktopWidgets: root.collect("desktopWidgets")
     readonly property var launcherActions: root.collect("launcherActions")
     readonly property var shortcuts: root.collect("shortcuts")
+    readonly property var quickToggles: root.collect("quickToggles")
 
     // The same lists over *installed* plugins, enabled or not.
     //

@@ -9,13 +9,19 @@ import qs.modules.common.widgets
 GroupButton {
     id: root
     
-    required property int buttonIndex
-    required property var buttonData
-    required property bool expandedSize
-    required property real baseCellWidth
-    required property real baseCellHeight
-    required property real cellSpacing
-    required property int cellSize
+    // Not `required`, deliberately. A component with an uninitialised required property
+    // cannot be constructed at all, which makes it impossible to load by URL - and
+    // loading by URL is what lets a toggle be resolved from an id at runtime instead of
+    // being named in a compile-time DelegateChoice. The delegate binds all of these
+    // immediately after construction; the defaults only exist so construction can
+    // happen.
+    property int buttonIndex: 0
+    property var buttonData: ({})
+    property bool expandedSize: false
+    property real baseCellWidth: 0
+    property real baseCellHeight: 0
+    property real cellSpacing: 0
+    property int cellSize: 1
     property var dropIndicatorRef: null
     property bool isUnused: false 
     property var gridRef: null
@@ -163,20 +169,29 @@ GroupButton {
             id: dragHandler
             target: null
 
+            // Collects every toggle under the grid, however deeply nested.
+            //
+            // This used to walk exactly three levels - grid, row, toggle - and require
+            // each candidate to carry `buttonData` itself. That made the drag
+            // behaviour depend on the delegate being the toggle, so wrapping toggles
+            // in a Loader (which is what lets them be resolved by id instead of by a
+            // compile-time DelegateChoice) would have silently stopped reordering from
+            // working, with nothing to see but drags that no longer land.
+            function collectToggles(item, out) {
+                if (!item || !item.visible)
+                    return;
+                if (item.buttonData) {
+                    out.push(item);
+                    return;
+                }
+                for (let i = 0; i < item.children.length; i++)
+                    collectToggles(item.children[i], out);
+            }
+
             function getAllSiblings() {
                 const siblings = [];
                 if (!root.gridRef) return siblings;
-                for (let r = 0; r < root.gridRef.children.length; r++) {
-                    const row = root.gridRef.children[r];
-                    if (!row || !row.visible) continue;
-                    const rowLayout = row.children[0];
-                    if (!rowLayout) continue;
-                    for (let c = 0; c < rowLayout.children.length; c++) {
-                        const sib = rowLayout.children[c];
-                        if (!sib || !sib.visible || !sib.buttonData) continue;
-                        siblings.push(sib);
-                    }
-                }
+                collectToggles(root.gridRef, siblings);
                 return siblings;
             }
 

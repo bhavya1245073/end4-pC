@@ -95,7 +95,7 @@ Singleton {
         return list;
     }
 
-    function find(id: string) {
+    function find(id: string): var {
         return root.all.find(w => w.id === id) ?? null;
     }
 

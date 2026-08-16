@@ -329,4 +329,61 @@ if (( clashes )); then
     status=1
 fi
 
+# ---------------------------------------------------------------------------
+# Phase 4: singletons used without importing the module that provides them.
+#
+# `QuickToggleRegistry.foo` in a file that never imported qs.core compiles cleanly -
+# an unresolved name inside a JS binding is a runtime error, not a compile one - and
+# then silently evaluates to undefined forever. That is exactly how AndroidQuickPanel
+# ended up with an empty toggle list while every phase above reported success.
+#
+# Deterministic: pure text, no engine, no cache ordering.
+# ---------------------------------------------------------------------------
+
+missing=0
+
+check_singleton_imports() {
+    local dir="$1" module="$2" file name base
+    base="$(basename "$dir")"
+
+    for file in "$dir"/*.qml; do
+        [[ -e "$file" ]] || continue
+        grep -q '^pragma Singleton' "$file" || continue
+        name="$(basename "$file" .qml)"
+
+        # Member access is how a singleton is used. Strip line comments first so a
+        # mention in prose does not count.
+        while read -r user; do
+            # Same directory resolves implicitly, and the file itself is not a user.
+            [[ "$(dirname "$user")" == "$dir" ]] && continue
+            # Either form registers the module: `import qs.services`, or the
+            # directory-relative `import "services"` / `import "../services"` that
+            # shell.qml uses.
+            grep -qE "^import[[:space:]]+$module([[:space:]]|$)" "$user" && continue
+            grep -qE "^import[[:space:]]+\"([^\"]*/)?$base\"" "$user" && continue
+            (( missing == 0 )) && echo "==> Singletons used without importing their module:"
+            missing=$(( missing + 1 ))
+            echo "    MISSING $module in ${user#./}  (uses $name)"
+        done < <(
+            grep -rlE "(^|[^A-Za-z0-9_.\"'])$name\.[A-Za-z_]" --include='*.qml' . \
+                --exclude-dir=.git \
+                | while read -r cand; do
+                    sed 's#//.*##' "$cand" \
+                        | grep -qE "(^|[^A-Za-z0-9_.\"'])$name\.[A-Za-z_]" && echo "$cand"
+                done
+        )
+    done
+}
+
+if [[ "$*" == "." ]]; then
+    check_singleton_imports "./core" "qs.core"
+    check_singleton_imports "./services" "qs.services"
+
+    if (( missing )); then
+        status=1
+    else
+        echo "==> Singleton imports: all $(( $(ls ./core/*.qml ./services/*.qml 2>/dev/null | wc -l) )) candidates resolve"
+    fi
+fi
+
 exit "$status"
