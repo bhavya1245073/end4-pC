@@ -34,11 +34,7 @@ Item {
     // up first, so a plugin can both add new widgets and replace a stock one by
     // reusing its id.
     function getWidgetUrl(name) {
-        if (!name) return "";
-        const pluginWidget = PluginRegistry.barWidget(name);
-        if (pluginWidget) return pluginWidget.url;
-        let formattedName = name.charAt(0).toUpperCase() + name.slice(1);
-        return Qt.resolvedUrl("./" + formattedName + ".qml");
+        return BarWidgetRegistry.url(name);
     }
 
     function getMirroredForIndex(layout, idx) {
@@ -48,32 +44,12 @@ Item {
 
     function shouldPaintMaterialPill(name) {
         if (Config.options.bar.cornerStyle !== 3) return false;
-        // Plugins opt out with `"materialPill": false` in their manifest.
-        const pluginWidget = PluginRegistry.barWidget(name);
-        if (pluginWidget) return pluginWidget.materialPill !== false;
-        const blacklist = ["workspaces", "divisor", "powerButton", "docktoPanel", "leftSidebarButton", "activeWindow"];
-        if (blacklist.includes(name)) {
-            return false;
-        }
-        return true;
+        return BarWidgetRegistry.wantsPill(name);
     }
 
     function getMaterialPillColor(name) {
         if (Config.options.bar.cornerStyle !== 3) return Appearance.colors.colPrimaryContainer;
-        // Plugins pick one with `"pillColor": "secondaryContainer"`.
-        const pluginWidget = PluginRegistry.barWidget(name);
-        if (pluginWidget?.pillColor) return Appearance.getColorFromName(pluginWidget.pillColor);
-        switch(name) {
-            case "media":
-            case "sysTray":
-                return Appearance.colors.colSecondaryContainer;
-            case "resources":
-                return Appearance.colors.colTertiaryContainer;
-            case "systemIcons":
-                return Appearance.colors.colPrimary; 
-            default:
-                return Appearance.colors.colPrimaryContainer;
-        }
+        return BarWidgetRegistry.pillColor(name);
     }
 
     property var screen: root.QsWindow.window?.screen

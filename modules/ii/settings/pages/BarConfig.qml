@@ -36,64 +36,25 @@ ContentPage {
         }
     }
 
-    readonly property var builtinWidgets: [
-        { id: "leftSidebarButton", name: Translation.tr("Left Sidebar Button"),  icon: "left_panel_open" },
-        { id: "workspaces",        name: Translation.tr("Workspaces"),           icon: "steppers" },
-        { id: "weatherBar",        name: Translation.tr("Weather"),              icon: "flare" },
-        { id: "media",             name: Translation.tr("Media"),                icon: "music_note" },
-        { id: "resources",         name: Translation.tr("Resources"),            icon: "empty_dashboard" },
-        { id: "systemIcons",       name: Translation.tr("System Icons"),         icon: "info" },
-        { id: "networkSpeed",      name: Translation.tr("Network Speed"),        icon: "network_check" },
-        { id: "clockWidget",       name: Translation.tr("Clock"),                icon: "schedule" },
-        { id: "utilButtons",       name: Translation.tr("Util Buttons"),         icon: "toggle_on" },
-        { id: "sysTray",           name: Translation.tr("Tray"),                 icon: "inbox" },
-        { id: "batteryIndicator",  name: Translation.tr("Battery"),              icon: "battery_android_frame_full" },
-        { id: "activeWindow",      name: Translation.tr("Active Window"),        icon: "subtitles" },
-        { id: "powerButton",       name: Translation.tr("Power Button"),         icon: "power_settings_new" },
-        { id: "updatesCount",      name: Translation.tr("Updates"),              icon: "deployed_code_update" },
-        { id: "docktoPanel",       name: Translation.tr("Dock to Panel"),        icon: "apps" },
-        { id: "visualizer",        name: Translation.tr("Visualizer"),           icon: "graphic_eq" },
-        { id: "hyprlandXkbIndicator",   name: Translation.tr("Keyboard Layout"), icon: "keyboard" },
-        { id: "divisor",            name: Translation.tr("Divider"),             icon: "horizontal_distribute" },
-        { id: "launcherButton",     name: Translation.tr("Launcher Button"),     icon: "search" },
-    ]
-
-    // Built-ins, plus one entry per `provides.barWidgets` of every enabled
-    // plugin. A plugin reusing a built-in id replaces it rather than duplicating
-    // it, matching how BarContent resolves widget urls.
-    readonly property var allWidgets: {
-        const list = page.builtinWidgets.slice()
-        for (const widget of PluginRegistry.barWidgets) {
-            const entry = {
-                id: widget.id,
-                name: widget.name ?? widget.id,
-                icon: widget.icon ?? "extension",
-                pluginId: widget.pluginId
-            }
-            const existing = list.findIndex(candidate => candidate.id === entry.id)
-            if (existing >= 0) list[existing] = entry
-            else list.push(entry)
-        }
-        return list
-    }
-
+    // What widgets exist, what they are called and which may repeat all come from
+    // core/BarWidgetRegistry.qml. This page used to hold the built-in list itself -
+    // nineteen entries of name and icon, in a settings page, while the bar that draws
+    // them held its own separate knowledge of where their files were and how to paint
+    // them.
     function availableFor() {
-        let used = [
+        const used = [
             ...Config.options.bar.layouts.leftLayout,
             ...Config.options.bar.layouts.middleLayout,
             ...Config.options.bar.layouts.rightLayout
         ]
-        const multipleAllowed = ["visualizer", "divisor"]
-        return allWidgets.filter(w => {
+        return BarWidgetRegistry.all.filter(w => {
             if (w.id === "divisor" && Config.options.bar.borderless !== "transparent") return false
-            if (PluginRegistry.barWidget(w.id)?.multipleAllowed) return true
-            return !used.includes(w.id) || multipleAllowed.includes(w.id)
+            return w.repeatable || !used.includes(w.id)
         })
     }
 
     function getWidgetName(id) {
-        const w = allWidgets.find(w => w.id === id)
-        return w ? w.name : id
+        return BarWidgetRegistry.name(id)
     }
 
     ColumnLayout {

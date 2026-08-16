@@ -11,7 +11,7 @@
     "barWidgets": [
       {
         "id": "battery",
-        "name": "Battery",
+        "name": "Battery Pill",
         "icon": "battery_android_full",
         "entry": "BatteryBarWidget.qml",
         "pillColor": "secondaryContainer"
