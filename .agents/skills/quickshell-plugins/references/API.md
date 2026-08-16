@@ -396,3 +396,39 @@ nix eval .#nixosConfigurations.nixos.config.home-manager.users.bhavya.programs.e
 `runtimeDeps` resolve against `pkgs`; unknown names warn and are skipped. Use
 `programs.end4.extraRuntimeDeps` for anything not a plain nixpkgs attribute, or
 for a devMode checkout (not scanned).
+
+---
+
+## Probing at runtime
+
+`qs -p some-probe.qml` runs a throwaway config against the real tree, which is the
+only way to check that something actually loads rather than merely compiles.
+
+Keep any window in a probe **invisible**. `PanelWindow { visible: true }` is a real
+layer-shell surface and will paint over the user's desktop for as long as the probe
+runs. Sizes and bindings still evaluate with `visible: false`.
+
+```qml
+// probe.qml - report and exit, paint nothing
+import QtQuick
+import Quickshell
+import qs.core
+
+Scope {
+    PluginModuleAnchors {}
+    // Singletons are lazy: touch it now or discovery has not started when you look.
+    Component.onCompleted: PluginRegistry.discovered
+
+    Timer {
+        interval: 2500
+        running: true
+        onTriggered: {
+            console.log(`PROBE|plugins=${PluginRegistry.all.length}`);
+            Qt.exit(0);
+        }
+    }
+}
+```
+
+Anything that writes user state (`PluginRegistry.setEnabled`, `Config.options.*`)
+writes to the real config. Back it up and restore it, or do not call it.

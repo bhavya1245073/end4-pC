@@ -36,6 +36,17 @@ import qs.modules.common.panels.lock
 import qs.modules.common.utils
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
+import qs.modules.ii.background.widgets
+import qs.modules.ii.background.widgets.calendar
+import qs.modules.ii.background.widgets.clock
+import qs.modules.ii.background.widgets.images
+import qs.modules.ii.background.widgets.media
+import qs.modules.ii.background.widgets.notes
+import qs.modules.ii.background.widgets.resources
+import qs.modules.ii.background.widgets.usercard
+import qs.modules.ii.background.widgets.visualizer
+import qs.modules.ii.background.widgets.weather
+import qs.modules.ii.background.widgets.worldclock
 import qs.modules.ii.bar
 import qs.modules.ii.sidebarRight.volumeMixer
 import qs.services

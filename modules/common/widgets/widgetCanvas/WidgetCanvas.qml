@@ -8,6 +8,10 @@ MouseArea {
     readonly property bool isWidgetCanvas: true
     readonly property bool gridVisible: showGrid && Config.options.background.showGrid
 
+    // Read by AbstractBackgroundWidget and PluginBackgroundWidget off their parent, so
+    // that a host loading a widget does not have to inject anything into it.
+    property bool wallpaperSafetyTriggered: false
+
     property bool centerXActive: false
     property bool centerYActive: false
 

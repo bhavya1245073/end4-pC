@@ -20,7 +20,9 @@ PluginBackgroundWidget {
     implicitWidth: root.size
     implicitHeight: root.size
 
-    visible: BatteryState.available
+    // Preserve the base's opacity gate (it hides widgets on the lock screen) while also
+    // staying out of the way on a desktop with no battery.
+    visible: BatteryState.available && root.opacity > 0
 
     readonly property color colBattery: BatteryState.accent(Theme.accent)
 
@@ -71,7 +73,7 @@ PluginBackgroundWidget {
                 text: `${BatteryState.percent}`
                 font.pixelSize: root.size / 4
                 font.weight: Font.Medium
-                color: root.colText
+                color: Theme.text
             }
 
             StyledText {
@@ -80,7 +82,7 @@ PluginBackgroundWidget {
 
                 text: "%"
                 font.pixelSize: root.size / 9
-                color: Theme.fade(root.colText, 0.35)
+                color: Theme.fade(Theme.text, 0.35)
             }
         }
 
@@ -90,7 +92,7 @@ PluginBackgroundWidget {
 
             text: BatteryState.summary()
             font.pixelSize: Math.max(Theme.font.xs, root.size / 14)
-            color: Theme.fade(root.colText, 0.35)
+            color: Theme.fade(Theme.text, 0.35)
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
         }

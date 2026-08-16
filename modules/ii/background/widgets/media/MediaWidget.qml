@@ -17,7 +17,6 @@ import qs.modules.ii.background.widgets
 AbstractBackgroundWidget {
     id: root
 
-    signal requestReset()
 
     configEntryName: "media"
     hoverEnabled: true
@@ -36,7 +35,7 @@ AbstractBackgroundWidget {
     }
     property var artUrl: currentPlayer?.trackArtUrl
     property string artDownloadLocation: Directories.coverArt
-    property string artFileName: Qt.md5(artUrl)
+    property string artFileName: Qt.md5(artUrl ?? "")
     property string artFilePath: `${artDownloadLocation}/${artFileName}`
 
     property real buttonSize: 34
@@ -121,7 +120,7 @@ AbstractBackgroundWidget {
 
     Process {
         id: coverArtDownloader
-        property string targetFile: root.artUrl
+        property string targetFile: root.artUrl ?? ""
         property string artFilePath: root.artFilePath
         command: ["bash", "-c", `[ -f ${artFilePath} ] || curl -sSL '${targetFile}' -o '${artFilePath}'`]
         onExited: { root.downloaded = true }

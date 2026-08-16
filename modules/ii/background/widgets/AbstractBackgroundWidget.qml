@@ -10,11 +10,26 @@ AbstractWidget {
     id: root
 
     required property string configEntryName
-    required property int screenWidth
-    required property int screenHeight
-    required property int scaledScreenWidth
-    required property int scaledScreenHeight
-    required property real wallpaperScale
+
+    // Geometry comes from the canvas this widget was dropped on, so a host does not
+    // have to inject it. (It used to be `required`, which meant every widget had to be
+    // hand-wired by whoever loaded it - eleven near-identical blocks of it.) A host
+    // that genuinely needs different numbers can still override them.
+    property real screenWidth: root.parent?.width ?? 0
+    property real screenHeight: root.parent?.height ?? 0
+    property real scaledScreenWidth: root.screenWidth
+    property real scaledScreenHeight: root.screenHeight
+    property real wallpaperScale: 1
+
+    // Set on the canvas by Background.qml when the wallpaper has been hidden for
+    // safety, so widgets can adapt. Read from the canvas for the same reason as the
+    // geometry above.
+    property bool wallpaperSafetyTriggered: root.parent?.wallpaperSafetyTriggered ?? false
+
+    // Ask the host to destroy and rebuild this widget. Any widget may emit it; the
+    // host watches for it generically.
+    signal requestReset()
+
     property bool visibleWhenLocked: Config.options.lock.showWidgets
     property var configEntry: Config.options.background.widgets[configEntryName]
     property string placementStrategy: configEntry.placementStrategy

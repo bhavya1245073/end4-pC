@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import qs
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -10,20 +11,6 @@ import QtQuick.Layouts
 Item {
     id: root
     implicitHeight: col.implicitHeight + 16
-
-    readonly property var widgetList: [
-        { key: "visualizer",  icon: "graphic_eq",         name: Translation.tr("Visualizer") },
-        { key: "customImage", icon: "image",              name: Translation.tr("Custom Image") },
-        { key: "weather",     icon: "partly_cloudy_day",  name: Translation.tr("Weather") },
-        { key: "clock",       icon: "schedule",           name: Translation.tr("Clock") },
-        { key: "media",       icon: "music_note",         name: Translation.tr("Media") },
-        { key: "images",      icon: "photo_library",      name: Translation.tr("Image Converter") },
-        { key: "resources",   icon: "monitor_heart",      name: Translation.tr("Resources") },
-        { key: "calendar",    icon: "calendar_month",     name: Translation.tr("Calendar") },
-        { key: "worldClock",  icon: "public",             name: Translation.tr("World Clock") },
-        { key: "userCard",    icon: "person",             name: Translation.tr("User Card") },
-        { key: "notes",       icon: "note_stack_add",     name: Translation.tr("Notes") },
-    ]
 
     Rectangle {
         anchors.fill: parent
@@ -53,15 +40,23 @@ Item {
             opacity: 0.4
         }
 
+        // Built-ins and plugin widgets in one list, from the one registry that knows
+        // they exist. A plugin's desktop widget shows up here without this file
+        // knowing anything about it - which is the whole point, because before this
+        // the list was hardcoded and plugin widgets could not be reached from the
+        // desktop menu at all.
         Repeater {
-            model: root.widgetList
+            model: DesktopWidgetRegistry.all
             delegate: ConfigSwitch {
                 required property var modelData
                 Layout.fillWidth: true
                 buttonIcon: modelData.icon
                 text: modelData.name
-                checked: Config.options.background.widgets[modelData.key].enable
-                onCheckedChanged: Config.options.background.widgets[modelData.key].enable = checked
+                // A widget whose plugin is switched off is shown but greyed, rather
+                // than vanishing, so the row does not jump around under the cursor.
+                enabled: DesktopWidgetRegistry.installed(modelData)
+                checked: DesktopWidgetRegistry.enabled(modelData)
+                onCheckedChanged: DesktopWidgetRegistry.setEnabled(modelData, checked)
             }
         }
     }

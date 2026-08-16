@@ -25,7 +25,6 @@ AbstractBackgroundWidget {
         const propName = "col" + customClockColorKey.charAt(0).toUpperCase() + customClockColorKey.slice(1);
         return Appearance.colors[propName] ?? root.colText;
     }
-    property bool wallpaperSafetyTriggered: false
     needsColText: clockStyle === "digital"
     x: forceCenter ? ((root.screenWidth - root.width) / 2) : targetX
     y: forceCenter ? ((root.screenHeight - root.height) / 2) : targetY

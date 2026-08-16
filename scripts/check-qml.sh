@@ -174,10 +174,18 @@ elif ! grep -q 'failures=0$' <<<"$summary"; then
 fi
 
 # ---------------------------------------------------------------------------
-# Phase 2: the plugin entry points, the way the shell loads them.
+# Phase 2: everything the shell loads by URL rather than by static import.
 #
-# Only the entries each manifest declares, with only the imports shell.qml really
-# has, so a module the core forgot to anchor shows up here rather than at runtime.
+# Plugin entry points, plus the built-in desktop widgets, which are now loaded from
+# DesktopWidgetRegistry by URL too. Only the imports shell.qml really has, so a
+# module the core forgot to anchor shows up here rather than at runtime.
+#
+# This phase matters because a `qs.foo` module only exists once something statically
+# compiled imports it. A file that resolves fine when compiled as part of a module
+# can fail when the same file is fetched by URL - which is how the clock widget broke
+# the moment it stopped being statically imported by Background.qml, since the type
+# it needed lived in a sibling file in its own directory.
+#
 # Still one engine for all of them, so this does not fully escape the cache
 # ordering described above - phase 3 is the deterministic check.
 # Skipped when a subtree was named, since then the run is deliberately partial.
@@ -193,6 +201,13 @@ if [[ "$*" == "." ]] && command -v jq >/dev/null 2>&1; then
             entries+="file://$dir/$entry,"
         done < <(jq -r '(.provides // {}) | to_entries[] | .value[]? | .entry // empty' "$manifest")
     done
+
+    # The built-in desktop widgets, read straight out of the registry's table so this
+    # cannot drift from what the shell actually loads.
+    while read -r path; do
+        [[ -n "$path" ]] || continue
+        entries+="file://$ROOT/modules/ii/background/widgets/$path,"
+    done < <(sed -n 's/.*path: "\([^"]*\)".*/\1/p' "$ROOT/core/DesktopWidgetRegistry.qml")
 
     entryHarness="$ROOT/.qml-check-entries.qml"
     entryLog="$(mktemp -t qml-entries.XXXXXX)"
@@ -225,7 +240,7 @@ ShellRoot {
 QML
 
     entryCount=$(( $(tr -cd ',' <<<"$entries" | wc -c) ))
-    echo "==> Loading $entryCount plugin entry point(s) the way the shell does..."
+    echo "==> Loading $entryCount URL-loaded entry point(s) the way the shell does..."
 
     QMLCHECK_TARGETS="$entries" qs -p "$entryHarness" >"$entryLog" 2>&1 &
     entry_pid=$!

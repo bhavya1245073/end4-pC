@@ -958,66 +958,36 @@ ContentPage {
                 }
             }
             
+            // Every desktop widget, built-in or from a plugin, from the one registry.
+            //
+            // This used to be two grids: a hardcoded nine-entry list of built-ins whose
+            // switch dispatched on the *icon name* to work out which config key to
+            // write - and which had silently lost the clock and custom-image widgets -
+            // followed by a near-identical grid for plugin widgets.
             GridLayout {
                 Layout.fillWidth: true
                 columns: 3
                 rowSpacing: 8
                 columnSpacing: 8
+
                 Repeater {
-                    model: [
-                        {
-                            icon: "weather_mix",
-                            name: Translation.tr("Weather"),
-                            enabled: Config.options.background.widgets.weather.enable
-                        },
-                        {
-                            icon: "image",
-                            name: Translation.tr("Image converter"),
-                            enabled: Config.options.background.widgets.images.enable
-                        },
-                        {
-                            icon: "music_note",
-                            name: Translation.tr("Media Player"),
-                            enabled: Config.options.background.widgets.media.enable
-                        },
-                        {
-                            icon: "memory",
-                            name: Translation.tr("Resources"),
-                            enabled: Config.options.background.widgets.resources.enable
-                        },
-                        {
-                            icon: "graphic_eq",
-                            name: Translation.tr("Visualizer"),
-                            enabled: Config.options.background.widgets.visualizer.enable
-                        },
-                        {
-                            icon: "calendar_month",
-                            name: Translation.tr("Calendar"),
-                            enabled: Config.options.background.widgets.calendar.enable
-                        },
-                        {
-                            icon: "public",
-                            name: Translation.tr("World Clock"),
-                            enabled: Config.options.background.widgets.worldClock.enable
-                        },
-                        {
-                            icon: "person",
-                            name: Translation.tr("User Card"),
-                            enabled: Config.options.background.widgets.userCard.enable
-                        },
-                        {
-                            icon: "note_stack_add",
-                            name: Translation.tr("Notes"),
-                            enabled: Config.options.background.widgets.notes.enable
-                        }
-                    ]
+                    model: DesktopWidgetRegistry.all
+
                     delegate: Rectangle {
+                        id: widgetCard
+
+                        required property var modelData
+                        readonly property bool widgetEnabled: DesktopWidgetRegistry.enabled(widgetCard.modelData)
+                        readonly property bool pluginOn: DesktopWidgetRegistry.installed(widgetCard.modelData)
+
                         Layout.fillWidth: true
                         Layout.preferredHeight: 105
                         radius: Appearance.rounding.normal
                         color: Appearance.colors.colLayer1
                         border.width: 1
                         border.color: Appearance.colors.colLayer0Border
+                        opacity: widgetCard.pluginOn ? 1 : 0.5
+
                         ColumnLayout {
                             anchors {
                                 top: parent.top
@@ -1026,113 +996,46 @@ ContentPage {
                                 margins: 12
                             }
                             spacing: 0
+
                             RowLayout {
                                 Layout.fillWidth: true
+
                                 MaterialSymbol {
-                                    text: modelData.icon
+                                    text: widgetCard.modelData.icon
                                     iconSize: Appearance.font.pixelSize.normal + 5
                                     color: Appearance.colors.colPrimary
                                 }
+
                                 Item { Layout.fillWidth: true }
+
                                 ConfigSwitch {
                                     Layout.fillWidth: false
-                                    checked: modelData.enabled
-                                    onCheckedChanged: {
-                                        if (modelData.icon === "weather_mix")
-                                            Config.options.background.widgets.weather.enable = checked
-                                        else if (modelData.icon === "image")
-                                            Config.options.background.widgets.images.enable = checked
-                                        else if (modelData.icon === "music_note")
-                                            Config.options.background.widgets.media.enable = checked
-                                        else if (modelData.icon === "memory")
-                                            Config.options.background.widgets.resources.enable = checked
-                                        else if (modelData.icon === "graphic_eq")
-                                            Config.options.background.widgets.visualizer.enable = checked
-                                        else if (modelData.icon === "calendar_month")
-                                            Config.options.background.widgets.calendar.enable = checked
-                                        else if (modelData.icon === "public")
-                                            Config.options.background.widgets.worldClock.enable = checked
-                                        else if (modelData.icon === "person")
-                                            Config.options.background.widgets.userCard.enable = checked
-                                        else if (modelData.icon === "note_stack_add")
-                                            Config.options.background.widgets.notes.enable = checked
-                                    }
+                                    enabled: widgetCard.pluginOn
+                                    checked: widgetCard.widgetEnabled
+                                    onCheckedChanged: DesktopWidgetRegistry.setEnabled(widgetCard.modelData, checked)
                                 }
                             }
+
                             StyledText {
-                                text: modelData.name
+                                Layout.fillWidth: true
+                                text: widgetCard.modelData.name
                                 font.pixelSize: Appearance.font.pixelSize.normal
                                 color: Appearance.colors.colOnLayer1
+                                elide: Text.ElideRight
                             }
+
                             StyledText {
-                                text: modelData.enabled ? Translation.tr("Enabled") : Translation.tr("Disabled")
+                                Layout.fillWidth: true
+                                text: {
+                                    if (widgetCard.modelData.pluginId === "")
+                                        return widgetCard.widgetEnabled ? Translation.tr("Enabled") : Translation.tr("Disabled");
+                                    if (!widgetCard.pluginOn)
+                                        return Translation.tr("Plugin disabled");
+                                    return PluginRegistry.plugins[widgetCard.modelData.pluginId]?.name ?? widgetCard.modelData.pluginId;
+                                }
                                 font.pixelSize: Appearance.font.pixelSize.small
                                 color: Appearance.colors.colSubtext
-                            }
-                        }
-                    }
-                }
-            }
-            ContentSubsection {
-                title: Translation.tr("From plugins")
-                visible: PluginRegistry.desktopWidgets.length > 0
-                Layout.bottomMargin: 10
-
-                GridLayout {
-                    Layout.fillWidth: true
-                    columns: 3
-                    rowSpacing: 8
-                    columnSpacing: 8
-                    Repeater {
-                        model: PluginRegistry.desktopWidgets
-                        delegate: Rectangle {
-                            id: pluginWidgetCard
-
-                            required property var modelData
-                            readonly property bool widgetEnabled: PluginConfig.widgetEnabled(pluginWidgetCard.modelData.pluginId, pluginWidgetCard.modelData.id, pluginWidgetCard.modelData.enabledByDefault !== false)
-
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 105
-                            radius: Appearance.rounding.normal
-                            color: Appearance.colors.colLayer1
-                            border.width: 1
-                            border.color: Appearance.colors.colLayer0Border
-                            ColumnLayout {
-                                anchors {
-                                    top: parent.top
-                                    left: parent.left
-                                    right: parent.right
-                                    margins: 12
-                                }
-                                spacing: 0
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    MaterialSymbol {
-                                        text: pluginWidgetCard.modelData.icon ?? "extension"
-                                        iconSize: Appearance.font.pixelSize.normal + 5
-                                        color: Appearance.colors.colPrimary
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    ConfigSwitch {
-                                        Layout.fillWidth: false
-                                        checked: pluginWidgetCard.widgetEnabled
-                                        onCheckedChanged: PluginConfig.setWidgetEnabled(pluginWidgetCard.modelData.pluginId, pluginWidgetCard.modelData.id, checked)
-                                    }
-                                }
-                                StyledText {
-                                    Layout.fillWidth: true
-                                    text: pluginWidgetCard.modelData.name ?? pluginWidgetCard.modelData.id
-                                    font.pixelSize: Appearance.font.pixelSize.normal
-                                    color: Appearance.colors.colOnLayer1
-                                    elide: Text.ElideRight
-                                }
-                                StyledText {
-                                    Layout.fillWidth: true
-                                    text: pluginWidgetCard.modelData.pluginName
-                                    font.pixelSize: Appearance.font.pixelSize.small
-                                    color: Appearance.colors.colSubtext
-                                    elide: Text.ElideRight
-                                }
+                                elide: Text.ElideRight
                             }
                         }
                     }

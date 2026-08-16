@@ -15,17 +15,6 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 
-import qs.modules.ii.background.widgets
-import qs.modules.ii.background.widgets.clock
-import qs.modules.ii.background.widgets.weather
-import qs.modules.ii.background.widgets.media
-import qs.modules.ii.background.widgets.images
-import qs.modules.ii.background.widgets.resources
-import qs.modules.ii.background.widgets.visualizer
-import qs.modules.ii.background.widgets.calendar
-import qs.modules.ii.background.widgets.worldclock
-import qs.modules.ii.background.widgets.usercard
-import qs.modules.ii.background.widgets.notes
 
 Variants {
     id: root
@@ -126,6 +115,25 @@ Variants {
         }
 
         property bool shouldBlur: (GlobalStates.screenLocked && Config.options.lock.blur.enable)
+
+        // Widgets that asked to be destroyed and rebuilt, by id. Emitting
+        // requestReset() unloads the widget, and it comes back when this clears.
+        // Generic, so it is not one widget's private arrangement with the host - which
+        // is what the previous version was, and it was broken.
+        property var widgetResetPending: ({})
+
+        function resetWidget(id) {
+            const next = Object.assign({}, bgRoot.widgetResetPending);
+            next[id] = true;
+            bgRoot.widgetResetPending = next;
+            widgetResetTimer.restart();
+        }
+
+        Timer {
+            id: widgetResetTimer
+            interval: 1000
+            onTriggered: bgRoot.widgetResetPending = ({})
+        }
         property color dominantColor: Appearance.colors.colPrimary
         property bool dominantColorIsDark: dominantColor.hslLightness < 0.5
         property color colText: {
@@ -473,6 +481,9 @@ Variants {
                 id: widgetCanvas
                 anchors.fill: parent
 
+                // Widgets read these off their parent instead of having them injected.
+                wallpaperSafetyTriggered: bgRoot.wallpaperSafetyTriggered
+
                 transitions: Transition {
                     PropertyAnimation {
                         properties: "width,height"
@@ -486,171 +497,41 @@ Variants {
                         easing.bezierCurve: Appearance.animation.elementMove.bezierCurve
                     }
                 }
-                FadeLoader {
-                    shown: Config.options.background.widgets.visualizer.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: VisualizerWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.customImage.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: CustomImage {
-                        screenWidth:        bgRoot.screen.width
-                        screenHeight:       bgRoot.screen.height
-                        scaledScreenWidth:  bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale:     1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.calendar.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: CalendarWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.weather.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: WeatherWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.clock.enable
-                        && (GlobalStates.screenLocked
-                            || Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: ClockWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                        wallpaperSafetyTriggered: bgRoot.wallpaperSafetyTriggered
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.notes.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: NotesWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                }
-                FadeLoader {
-                    id: mediaLoader
-                    property bool enableLoading: true
-                    shown: Config.options.background.widgets.media.enable && enableLoading
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: MediaWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                    onLoaded: {
-                        if (item && item.requestReset) {
-                            item.requestReset.connect(() => {
-                                mediaLoader.enableLoading = false
-                                mediaTimer.running = true
-                            })
-                        }
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.images.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: ImageConverterWidget {
-                        screenWidth:        bgRoot.screen.width
-                        screenHeight:       bgRoot.screen.height
-                        scaledScreenWidth:  bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale:     1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.resources.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: ResourcesWidget {
-                        screenWidth:        bgRoot.screen.width
-                        screenHeight:       bgRoot.screen.height
-                        scaledScreenWidth:  bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale:     1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.worldClock.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: WorldClockWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                }
-                FadeLoader {
-                    shown: Config.options.background.widgets.userCard.enable
-                        && (Config.options.background.screenList.length === 0
-                            || Config.options.background.screenList.includes(bgRoot.screen.name))
-                    sourceComponent: UserCardWidget {
-                        screenWidth: bgRoot.screen.width
-                        screenHeight: bgRoot.screen.height
-                        scaledScreenWidth: bgRoot.screen.width
-                        scaledScreenHeight: bgRoot.screen.height
-                        wallpaperScale: 1
-                    }
-                }
-
-                // Desktop widgets contributed by plugins. They inherit
-                // PluginBackgroundWidget, which reads its geometry from the
-                // canvas, so there is nothing to inject here.
+                // Every desktop widget, built-in or contributed by a plugin, loaded
+                // from the one registry that knows they exist. This used to be eleven
+                // hand-written FadeLoaders - one per built-in, each injecting the same
+                // five geometry properties - plus a twelfth for plugin widgets. The
+                // duplication had already rotted: the media widget's reset handler
+                // referred to a `mediaTimer` that does not exist anywhere in the file,
+                // so resetting it unloaded it permanently.
                 //
-                // Installed rather than active, so that toggling any plugin does not
-                // reassign this model and rebuild every plugin widget on the desktop;
-                // whether this one's plugin is on is part of `shown`.
+                // Widgets read their geometry from this canvas, so there is nothing to
+                // inject. See core/DesktopWidgetRegistry.qml.
                 Repeater {
-                    model: PluginRegistry.installedDesktopWidgets
+                    model: DesktopWidgetRegistry.all
+
                     delegate: FadeLoader {
                         required property var modelData
-                        // isLoaded rather than isActive, so toggling a plugin paints
-                        // before its widget is built: FadeLoader is a plain Loader and
-                        // loads synchronously.
-                        shown: PluginRegistry.isLoaded(modelData.pluginId)
-                            && PluginConfig.widgetEnabled(modelData.pluginId, modelData.id, modelData.enabledByDefault !== false)
-                            && (Config.options.background.screenList.length === 0
-                                || Config.options.background.screenList.includes(bgRoot.screen.name))
+
+                        readonly property bool onThisScreen: modelData.showWhenLocked && GlobalStates.screenLocked
+                            || Config.options.background.screenList.length === 0
+                            || Config.options.background.screenList.includes(bgRoot.screen.name)
+
+                        shown: DesktopWidgetRegistry.available(modelData)
+                            && DesktopWidgetRegistry.enabled(modelData)
+                            && onThisScreen
+                            && !(bgRoot.widgetResetPending[modelData.id] ?? false)
+
+                        // Asynchronous so that switching a widget on does not block the
+                        // frame that acknowledged the click.
                         asynchronous: true
                         source: modelData.url
+
+                        // Any widget may ask to be rebuilt by emitting requestReset().
+                        onLoaded: {
+                            if (item?.requestReset)
+                                item.requestReset.connect(() => bgRoot.resetWidget(modelData.id));
+                        }
                     }
                 }
             }
