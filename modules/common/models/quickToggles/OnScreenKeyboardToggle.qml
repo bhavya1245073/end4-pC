@@ -5,14 +5,15 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
+import qs.core
 
 QuickToggleModel {
     name: Translation.tr("Virtual Keyboard")
-    toggled: GlobalStates.oskOpen
+    toggled: PanelRegistry.state("onScreenKeyboard").open
     icon: toggled ? "keyboard_hide" : "keyboard"
     
     mainAction: () => {
-        GlobalStates.oskOpen = !GlobalStates.oskOpen
+        PanelRegistry.toggle("onScreenKeyboard")
     }
 
     tooltipText: Translation.tr("On-screen keyboard")

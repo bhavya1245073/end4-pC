@@ -25,14 +25,43 @@ Singleton {
     readonly property int apiVersion: 1
     readonly property int minApiVersion: 1
 
-    readonly property string pluginsDir: `${Quickshell.shellDir}/plugins`
+    // Where plugins are looked for, in increasing precedence: a later path shadows an
+    // earlier one, so a user copy of `battery` wins over the shipped one.
+    //
+    //   <shell>/plugins            what ships with the shell
+    //   ~/.config/illogical-impulse/plugins   drop a folder in, no rebuild, no git
+    //   $END4_PLUGIN_PATH          colon-separated, for a Nix config or a dev checkout
+    //
+    // The last of those is how out-of-tree plugins stay out of tree: the NixOS module
+    // points at them instead of copying them into the shell derivation, and a devMode
+    // checkout keeps working without symlinking anything into it.
+    readonly property list<string> pluginPaths: {
+        const paths = [`${Quickshell.shellDir}/plugins`, root.userPluginsDir];
+        for (const extra of (Quickshell.env("END4_PLUGIN_PATH") ?? "").split(":")) {
+            const trimmed = extra.trim();
+            if (trimmed.length > 0 && !paths.includes(trimmed))
+                paths.push(trimmed);
+        }
+        return paths;
+    }
+
+    // The one path that is writable and outlives a rebuild.
+    readonly property string userPluginsDir: `${Quickshell.env("XDG_CONFIG_HOME") || `${Quickshell.env("HOME")}/.config`}/illogical-impulse/plugins`
+
+    // The first path, kept as a property because the settings GUI offers to open it and
+    // launcher actions resolve scripts against a plugin's own directory.
+    readonly property string pluginsDir: root.pluginPaths[0]
+
+    // id -> the directory that won. Written by rescan(), read by resolve() and by
+    // PluginManifest, so a plugin's files always resolve against the path it came from.
+    property var pluginDirs: ({})
 
     // id -> descriptor. Reassigned (never mutated) so bindings update.
     // Descriptor: { id, name, description, version, author, icon, dir, url,
     //               provides, settings, manifest }
     property var plugins: ({})
 
-    // Ids of every directory found under pluginsDir, whether or not its
+    // Ids of every directory found on any search path, whether or not its
     // manifest parsed successfully.
     property var discovered: []
 
@@ -193,7 +222,13 @@ Singleton {
     }
 
     function resolve(pluginId: string, relativePath: string): string {
-        return `file://${root.pluginsDir}/${pluginId}/${relativePath}`;
+        return `file://${root.dirOf(pluginId)}/${relativePath}`;
+    }
+
+    // The directory a plugin was found in. Falls back to the first search path so that a
+    // caller asking about an unknown id gets a plausible path rather than "undefined".
+    function dirOf(pluginId: string): string {
+        return root.pluginDirs[pluginId] ?? `${root.pluginsDir}/${pluginId}`;
     }
 
     function get(pluginId: string): var {
@@ -337,19 +372,22 @@ Singleton {
     // -------------------------------------------------------------- discovery
 
     function rescan() {
-        const ids = [];
-        for (let i = 0; i < pluginFolders.count; i++) {
-            const name = pluginFolders.get(i, "fileName");
-            if (!name || name.startsWith(".") || name.startsWith("_"))
+        // Later paths shadow earlier ones, so walk in order and let each overwrite.
+        const dirs = ({});
+        for (let scanner = 0; scanner < folderScanners.count; scanner++) {
+            const folders = folderScanners.objectAt(scanner);
+            if (!folders)
                 continue;
-            ids.push(name);
+            for (const name of folders.entries)
+                dirs[name] = `${folders.base}/${name}`;
         }
         // Clearing here is safe: every manifest re-registers as the
         // Instantiator rebuilds its delegates from the new id list.
         root.pending = ({});
         root.plugins = ({});
         root.errors = [];
-        root.discovered = ids;
+        root.pluginDirs = dirs;
+        root.discovered = Object.keys(dirs).sort();
     }
 
     // Manifests arrive one at a time, each from its own FileView. Assigning
@@ -376,8 +414,8 @@ Singleton {
             version: manifest.version ?? "",
             author: manifest.author ?? "",
             icon: manifest.icon ?? "extension",
-            dir: `${root.pluginsDir}/${pluginId}`,
-            url: `file://${root.pluginsDir}/${pluginId}`,
+            dir: root.dirOf(pluginId),
+            url: `file://${root.dirOf(pluginId)}`,
             provides: manifest.provides ?? ({}),
             settings: Array.isArray(manifest.settings) ? manifest.settings : [],
             manifest: manifest
@@ -404,18 +442,89 @@ Singleton {
         ]);
     }
 
-    FolderListModel {
-        id: pluginFolders
-        folder: `file://${root.pluginsDir}`
-        showDirs: true
-        showFiles: false
-        showDotAndDotDot: false
-        showHidden: false
-        sortField: FolderListModel.Name
-        onCountChanged: rescanTimer.restart()
+    // One folder watcher per search path. A missing directory is not an error - the user
+    // plugin directory usually does not exist - it simply contributes nothing.
+    Instantiator {
+        id: folderScanners
+        model: root.pluginPaths
+        delegate: QtObject {
+            id: scanner
+            required property string modelData
+            readonly property string base: modelData
+
+            // Whether this search path exists.
+            //
+            // The check is a real stat rather than something inferred from the model, because
+            // FolderListModel cannot be asked: pointed at a directory that does not exist it
+            // reports zero entries, exactly like an empty one, and pointed at a bad path *after*
+            // listing something else it keeps the old contents. Comparing each entry's own
+            // filePath against the requested path was the previous attempt, and it fails the case
+            // that matters most - the shell directory is usually a symlink, Qt canonicalises
+            // filePath through it, and every plugin was rejected as "not on this path".
+            property bool exists: false
+            property bool checked: false
+
+            function check(): void {
+                PluginUtils.run(["test", "-d", scanner.base], (stdout, code) => {
+                    scanner.exists = code === 0;
+                    scanner.checked = true;
+                    PluginRegistry.scheduleRescan();
+                });
+            }
+
+            Component.onCompleted: scanner.check()
+
+            readonly property var entries: {
+                if (!scanner.exists)
+                    return [];
+                const found = [];
+                for (let i = 0; i < folderModel.count; i++) {
+                    const name = folderModel.get(i, "fileName") ?? "";
+                    if (!name || name.startsWith(".") || name.startsWith("_"))
+                        continue;
+                    found.push(name);
+                }
+                return found;
+            }
+
+            readonly property FolderListModel __model: FolderListModel {
+                id: folderModel
+                folder: scanner.exists ? `file://${scanner.base}` : ""
+                showDirs: true
+                showFiles: false
+                showDotAndDotDot: false
+                showHidden: false
+                sortField: FolderListModel.Name
+                // Through the singleton, not the outer `rescanTimer` id: this file sets
+                // `pragma ComponentBehavior: Bound`, so a delegate cannot see ids in the
+                // enclosing scope, and the handler would fail silently - leaving discovery
+                // stuck on whatever the first, empty scan found.
+                onCountChanged: PluginRegistry.scheduleRescan()
+            }
+        }
+        onObjectAdded: PluginRegistry.scheduleRescan()
+        onObjectRemoved: PluginRegistry.scheduleRescan()
     }
 
     // Coalesces the incremental countChanged bursts a folder scan produces.
+    function scheduleRescan(): void {
+        rescanTimer.restart();
+    }
+
+    // One line per search path: whether it exists and how many plugin directories are on it.
+    // Surfaced over IPC as `plugins scan`, because "my plugin is not showing up" has exactly three
+    // causes - wrong path, path does not exist, directory has no manifest - and this separates them.
+    function scannerReport(): string {
+        const lines = [];
+        for (let index = 0; index < folderScanners.count; index++) {
+            const scanner = folderScanners.objectAt(index);
+            if (!scanner)
+                continue;
+            lines.push(`${scanner.checked ? (scanner.exists ? "exists " : "missing") : "pending"} ${String(scanner.entries.length).padStart(3)} entries  ${scanner.base}`);
+        }
+        return lines.join("\n");
+    }
+
     Timer {
         id: rescanTimer
         interval: 20

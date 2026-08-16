@@ -5,6 +5,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
+import qs.core
 
 QuickToggleModel {
     name: Translation.tr("Screen snip")
@@ -13,7 +14,7 @@ QuickToggleModel {
     icon: "screenshot_region"
 
     mainAction: () => {
-        GlobalStates.sidebarRightOpen = false;
+        PanelRegistry.close("sidebarRight");
         delayedActionTimer.start();
     }
     Timer {

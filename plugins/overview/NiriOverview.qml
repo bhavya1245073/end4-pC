@@ -12,6 +12,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Item {
     id: root
@@ -84,9 +85,9 @@ Item {
     }
 
     Connections {
-        target: GlobalStates
-        function onOverviewOpenChanged() {
-            if (GlobalStates.overviewOpen) scrollTimer.restart()
+        target: PanelRegistry.state("overview")
+        function onOpenChanged() {
+            if (PanelRegistry.state("overview").open) scrollTimer.restart()
         }
     }
 
@@ -357,7 +358,7 @@ Item {
                             anchors.fill: parent
                             enabled: !root.isDragging && rowItem.wsWindows.length === 0
                             onClicked: {
-                                GlobalStates.overviewOpen = false
+                                PanelRegistry.close("overview")
                                 Hyprland.dispatch(`hl.dsp.focus({ workspace = ${rowItem.wsId} })`)
                             }
                         }
@@ -510,7 +511,7 @@ Item {
                                     if (dragStarted) return
                                     if (!winContainer.win) return
                                     if (event.button === Qt.LeftButton) {
-                                        GlobalStates.overviewOpen = false
+                                        PanelRegistry.close("overview")
                                         Hyprland.dispatch(`hl.dsp.focus({ window = "address:${winContainer.win.address}" })`)
                                         event.accepted = true
                                     } else if (event.button === Qt.MiddleButton) {

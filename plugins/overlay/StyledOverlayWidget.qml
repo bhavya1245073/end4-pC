@@ -9,6 +9,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import "."
+import qs.core
 
 /*
  * To make an overlay widget:
@@ -52,7 +53,7 @@ AbstractOverlayWidget {
     property bool resizing: false
     property int resizeXDirection: getXResizeDirection(mouseX)
     property int resizeYDirection: getYResizeDirection(mouseY)
-    draggable: GlobalStates.overlayOpen
+    draggable: PanelRegistry.state("overlay").open
     drag.target: undefined
     animateXPos: !dragHandler.active
     animateYPos: !dragHandler.active
@@ -85,7 +86,7 @@ AbstractOverlayWidget {
         maximumX: root.parent?.width - root.width
         maximumY: root.parent?.height - root.height
     }
-    opacity: (GlobalStates.overlayOpen || !clickthrough) ? 1.0 : Config.options.overlay.clickthroughOpacity
+    opacity: (PanelRegistry.state("overlay").open || !clickthrough) ? 1.0 : Config.options.overlay.clickthroughOpacity
 
     // Guarded states & registration funcs
     property bool open: Persistent.states.overlay.open
@@ -190,7 +191,7 @@ AbstractOverlayWidget {
         root.savePosition(targetX, targetY)
     }
 
-    visible: GlobalStates.overlayOpen || actuallyPinned
+    visible: PanelRegistry.state("overlay").open || actuallyPinned
     implicitWidth: contentColumn.implicitWidth + resizeMargin * 2
     implicitHeight: contentColumn.implicitHeight + resizeMargin * 2
 
@@ -200,12 +201,12 @@ AbstractOverlayWidget {
             fill: parent
             margins: root.resizeMargin
         }
-        color: ColorUtils.transparentize(Appearance.colors.colLayer1Base, (root.fancyBorders && GlobalStates.overlayOpen) ? 0 : 1)
+        color: ColorUtils.transparentize(Appearance.colors.colLayer1Base, (root.fancyBorders && PanelRegistry.state("overlay").open) ? 0 : 1)
         radius: root.radius
-        border.color: ColorUtils.transparentize(Appearance.colors.colOutlineVariant, GlobalStates.overlayOpen ? 0 : 1)
+        border.color: ColorUtils.transparentize(Appearance.colors.colOutlineVariant, PanelRegistry.state("overlay").open ? 0 : 1)
         border.width: 1
 
-        layer.enabled: GlobalStates.overlayOpen
+        layer.enabled: PanelRegistry.state("overlay").open
         layer.effect: OpacityMask {
             maskSource: Rectangle {
                 width: border.width
@@ -223,7 +224,7 @@ AbstractOverlayWidget {
             // Title bar
             Rectangle {
                 id: titleBar
-                opacity: GlobalStates.overlayOpen ? 1 : 0
+                opacity: PanelRegistry.state("overlay").open ? 1 : 0
                 Layout.fillWidth: true
                 implicitWidth: titleBarRow.implicitWidth + root.padding * 2
                 implicitHeight: titleBarRow.implicitHeight + root.padding * 2

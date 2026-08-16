@@ -9,6 +9,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import qs.core
 
 ColumnLayout {
     id: root
@@ -169,7 +170,7 @@ ColumnLayout {
 
             onLinkActivated: (link) => {
                 Qt.openUrlExternally(link)
-                GlobalStates.sidebarLeftOpen = false
+                PanelRegistry.close("sidebarLeft")
             }
 
             MouseArea { // Pointing hand for links

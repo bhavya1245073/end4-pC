@@ -4,12 +4,17 @@
   "title": "end4-pC plugin manifest",
   "description": "A plugin is one folder holding a manifest.json. Add \"$schema\": \"../../core/manifest.schema.json\" as the first key for editor completion and validation. scripts/validate-plugin.sh checks a manifest against this file.",
   "type": "object",
-  "required": ["id", "name", "version", "apiVersion"],
+  "required": [
+    "id",
+    "name",
+    "version",
+    "apiVersion"
+  ],
   "additionalProperties": false,
-
   "properties": {
-    "$schema": { "type": "string" },
-
+    "$schema": {
+      "type": "string"
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -35,9 +40,15 @@
       "type": "string",
       "description": "One line. Longer than that makes the plugin list ragged."
     },
-    "author": { "type": "string" },
-    "homepage": { "type": "string" },
-    "license": { "type": "string" },
+    "author": {
+      "type": "string"
+    },
+    "homepage": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
     "icon": {
       "$ref": "#/definitions/materialSymbol",
       "description": "Material Symbol name for the plugin list. scripts/check-icons.sh validates these against the installed font - an unknown name is not an error at runtime, the font just renders the string."
@@ -47,7 +58,6 @@
       "default": false,
       "description": "Whether the plugin is on before the user has ever touched it."
     },
-
     "requires": {
       "type": "object",
       "additionalProperties": false,
@@ -55,249 +65,520 @@
       "properties": {
         "compositor": {
           "type": "array",
-          "items": { "enum": ["hyprland", "niri", "sway", "river"] },
+          "items": {
+            "enum": [
+              "hyprland",
+              "niri",
+              "sway",
+              "river"
+            ]
+          },
           "minItems": 1
         }
       }
     },
-
     "runtimeDeps": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "nixpkgs attribute names put on the shell's PATH. Resolved at build time by modules/home/quickshell/default.nix; a name that does not exist fails the rebuild rather than the plugin. Use packageOverrides there when the attribute name differs."
     },
-
     "provides": {
       "type": "object",
       "additionalProperties": false,
       "description": "What the plugin contributes. Every kind is optional; a plugin providing nothing is legal but does nothing.",
       "properties": {
-        "barWidgets":       { "type": "array", "items": { "$ref": "#/definitions/barWidget" } },
-        "desktopWidgets":   { "type": "array", "items": { "$ref": "#/definitions/desktopWidget" } },
-        "quickToggles":     { "type": "array", "items": { "$ref": "#/definitions/quickToggle" } },
-        "panels":           { "type": "array", "items": { "$ref": "#/definitions/entryOnly" } },
-        "services":         { "type": "array", "items": { "$ref": "#/definitions/entryOnly" } },
-        "ipc":              { "type": "array", "items": { "$ref": "#/definitions/entryOnly" } },
-        "settingsPages":    { "type": "array", "items": { "$ref": "#/definitions/settingsPage" } },
-        "settingsSections": { "type": "array", "items": { "$ref": "#/definitions/settingsSection" } },
-        "launcherActions":  { "type": "array", "items": { "$ref": "#/definitions/launcherAction" } },
-        "searchProviders":  { "type": "array", "items": { "$ref": "#/definitions/searchProvider" } },
-        "contextMenuItems": { "type": "array", "items": { "$ref": "#/definitions/contextMenuItem" } },
-        "osdIndicators":    { "type": "array", "items": { "$ref": "#/definitions/osdIndicator" } },
-        "shortcuts":        { "type": "array", "items": { "$ref": "#/definitions/shortcut" } }
+        "barWidgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/barWidget"
+          }
+        },
+        "desktopWidgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/desktopWidget"
+          }
+        },
+        "quickToggles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/quickToggle"
+          }
+        },
+        "panels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/entryOnly"
+          }
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/entryOnly"
+          }
+        },
+        "ipc": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/entryOnly"
+          }
+        },
+        "settingsPages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/settingsPage"
+          }
+        },
+        "settingsSections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/settingsSection"
+          }
+        },
+        "launcherActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/launcherAction"
+          }
+        },
+        "searchProviders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/searchProvider"
+          }
+        },
+        "contextMenuItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/contextMenuItem"
+          }
+        },
+        "osdIndicators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/osdIndicator"
+          }
+        },
+        "shortcuts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/shortcut"
+          }
+        }
       }
     },
-
     "settings": {
       "type": "array",
       "description": "User-editable settings, rendered automatically in Settings -> Plugins and in any settings section. Read them as settings.<key> on a base type, or PluginConfig.of(\"id\").<key> anywhere.",
-      "items": { "$ref": "#/definitions/setting" }
+      "items": {
+        "$ref": "#/definitions/setting"
+      }
     }
   },
-
   "definitions": {
     "materialSymbol": {
       "type": "string",
       "pattern": "^[a-z0-9_]+$",
       "description": "A Material Symbols Rounded ligature name, e.g. battery_full. Not a file path."
     },
-
     "qmlFile": {
       "type": "string",
       "pattern": "\\.qml$",
       "description": "Path to a .qml file, relative to the plugin folder."
     },
-
     "entryOnly": {
       "type": "object",
-      "required": ["entry"],
+      "required": [
+        "entry"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string" },
-        "entry": { "$ref": "#/definitions/qmlFile" }
+        "id": {
+          "type": "string"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        }
       }
     },
-
     "barWidget": {
       "type": "object",
-      "required": ["id", "entry"],
+      "required": [
+        "id",
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A widget the user can place in the bar. Its root should be a PluginBarWidget.",
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9]*$", "description": "Also the layout token stored in the user's bar config. Reusing a built-in id replaces that built-in." },
-        "name": { "type": "string" },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "materialPill": { "type": "boolean", "default": true, "description": "Whether the bar paints its pill behind this widget." },
-        "pillColor": { "$ref": "#/definitions/appearanceColor" },
-        "multipleAllowed": { "type": "boolean", "default": false, "description": "May appear more than once in a layout." },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$",
+          "description": "Also the layout token stored in the user's bar config. Reusing a built-in id replaces that built-in."
+        },
+        "name": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "materialPill": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the bar paints its pill behind this widget."
+        },
+        "pillColor": {
+          "$ref": "#/definitions/appearanceColor"
+        },
+        "multipleAllowed": {
+          "type": "boolean",
+          "default": false,
+          "description": "May appear more than once in a layout."
+        },
         "zone": {
-          "enum": ["left", "center", "middle", "right"],
+          "enum": [
+            "left",
+            "center",
+            "middle",
+            "right"
+          ],
           "description": "Where to place the widget the first time the plugin is enabled. Without this, enabling the plugin appears to do nothing until the user drags the widget in from Settings -> Bar. Applied once and recorded; removing it afterwards is respected."
         },
-        "zoneOrder": { "type": "integer", "default": 50, "description": "Order relative to other auto-placed widgets in the same zone." }
+        "zoneOrder": {
+          "type": "integer",
+          "default": 50,
+          "description": "Order relative to other auto-placed widgets in the same zone."
+        }
       }
     },
-
     "desktopWidget": {
       "type": "object",
-      "required": ["id", "entry"],
+      "required": [
+        "id",
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A draggable widget on the desktop. Its root should be a PluginDesktopCard (header, content, footer, resize, persistence) or a bare PluginBackgroundWidget.",
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9]*$", "description": "Must match the widgetId the QML sets, or position and size are stored under a different key than they are read from." },
-        "name": { "type": "string" },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "enabledByDefault": { "type": "boolean", "default": false, "description": "Whether the widget is on the desktop as soon as the plugin is enabled." }
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$",
+          "description": "Must match the widgetId the QML sets, or position and size are stored under a different key than they are read from."
+        },
+        "name": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "enabledByDefault": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the widget is on the desktop as soon as the plugin is enabled."
+        }
       }
     },
-
     "quickToggle": {
       "type": "object",
-      "required": ["id", "entry"],
+      "required": [
+        "id",
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A tile in the sidebar's quick settings. Inherit AndroidQuickToggleButton and it works in the classic panel too.",
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9]*$" },
-        "name": { "type": "string" },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "classicEntry": { "$ref": "#/definitions/qmlFile", "description": "A different file for the classic panel. Omit to use the same one." },
-        "menu": { "$ref": "#/definitions/qmlFile", "description": "Expanded panel shown when the tile's chevron is tapped." }
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "classicEntry": {
+          "$ref": "#/definitions/qmlFile",
+          "description": "A different file for the classic panel. Omit to use the same one."
+        },
+        "menu": {
+          "$ref": "#/definitions/qmlFile",
+          "description": "Expanded panel shown when the tile's chevron is tapped."
+        }
       }
     },
-
     "settingsPage": {
       "type": "object",
-      "required": ["id", "entry"],
+      "required": [
+        "id",
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A whole page in Settings with its own navigation entry. Prefer settingsSections unless the plugin really owns a page's worth of UI.",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "order": { "type": "integer", "default": 100 }
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "order": {
+          "type": "integer",
+          "default": 100
+        }
       }
     },
-
     "settingsSection": {
       "type": "object",
-      "required": ["id", "page", "entry"],
+      "required": [
+        "id",
+        "page",
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A section injected into an existing Settings page, so a plugin's settings sit next to the related built-in ones and disappear when it is switched off.",
       "properties": {
-        "id": { "type": "string" },
+        "id": {
+          "type": "string"
+        },
         "page": {
           "type": "string",
           "description": "Host page name, matched case-insensitively. Pages that host sections: Interface, Bar, Desktop, Services, Appearance, Advanced.",
-          "examples": ["Interface", "Bar", "Desktop", "Services", "Appearance", "Advanced"]
+          "examples": [
+            "Interface",
+            "Bar",
+            "Desktop",
+            "Services",
+            "Appearance",
+            "Advanced"
+          ]
         },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "order": { "type": "integer", "default": 100 }
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "order": {
+          "type": "integer",
+          "default": 100
+        }
       }
     },
-
     "launcherAction": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "description": "A static entry in the launcher, matched by name. For answering queries dynamically use searchProviders instead.",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "exec": { "$ref": "#/definitions/argv" },
-        "script": { "type": "string", "description": "A script inside the plugin folder, run instead of exec. Anything typed after the action name is appended as arguments." }
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "exec": {
+          "$ref": "#/definitions/argv"
+        },
+        "script": {
+          "type": "string",
+          "description": "A script inside the plugin folder, run instead of exec. Anything typed after the action name is appended as arguments."
+        }
       }
     },
-
     "searchProvider": {
       "type": "object",
-      "required": ["entry"],
+      "required": [
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A live query handler in the launcher: a calculator, a converter, a dictionary, a note search. Its root must be a PluginSearchProvider. Fields here override the QML's own defaults.",
       "properties": {
-        "id": { "type": "string" },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "prefix": { "type": "string", "description": "Only consulted for queries starting with this. Empty means every query - correct only for a provider that can tell from the query itself whether it applies." },
-        "minLength": { "type": "integer", "minimum": 1, "default": 1 },
-        "order": { "type": "integer", "default": 50, "description": "Lower sorts this provider's block of results earlier." },
-        "limit": { "type": "integer", "minimum": 1, "default": 10 }
+        "id": {
+          "type": "string"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Only consulted for queries starting with this. Empty means every query - correct only for a provider that can tell from the query itself whether it applies."
+        },
+        "minLength": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "order": {
+          "type": "integer",
+          "default": 50,
+          "description": "Lower sorts this provider's block of results earlier."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        }
       }
     },
-
     "contextMenuItem": {
       "type": "object",
-      "required": ["id", "label"],
+      "required": [
+        "id",
+        "label"
+      ],
       "additionalProperties": false,
-      "description": "A row in the desktop right-click menu. Exactly one of ipc, exec or entry decides what it does.",
+      "description": "A row in the desktop right-click menu. Exactly one of ipc, panel, exec or entry decides what it does.",
       "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "order": { "type": "integer", "default": 50, "description": "Position among all rows. Built-ins sit at 10 (Wallpaper), 20 (Widgets), 30 (DropShelf), 40 (Live Wallpaper) and 100 (Settings)." },
-        "ipc": { "$ref": "#/definitions/ipcCall" },
-        "exec": { "$ref": "#/definitions/argv" },
-        "entry": { "$ref": "#/definitions/qmlFile", "description": "A submenu the plugin draws itself, opened on hover." }
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "order": {
+          "type": "integer",
+          "default": 50,
+          "description": "Position among all rows. The shell own rows sit at 10 (Wallpaper), 20 (Widgets) and 100 (Settings)."
+        },
+        "ipc": {
+          "$ref": "#/definitions/ipcCall"
+        },
+        "exec": {
+          "$ref": "#/definitions/argv"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile",
+          "description": "A submenu the plugin draws itself, opened on hover."
+        },
+        "panel": {
+          "$ref": "#/definitions/panelAction"
+        },
+        "badge": {
+          "type": "string",
+          "description": "A PluginBus topic whose retained value is shown at the right of the row, e.g. \"dropover:count\". Updates live while the menu is open."
+        }
       }
     },
-
     "osdIndicator": {
       "type": "object",
-      "required": ["id", "entry"],
+      "required": [
+        "id",
+        "entry"
+      ],
       "additionalProperties": false,
       "description": "A HUD shown over everything and dismissed on a timer: a countdown, a progress bar, a status flash. Show it with OsdRegistry.show(\"id\"). The QML draws content only; the shell owns the window, placement and timeout.",
       "properties": {
-        "id": { "type": "string" },
-        "entry": { "$ref": "#/definitions/qmlFile" },
-        "timeout": { "type": "integer", "minimum": 0, "default": 0, "description": "Milliseconds. 0 uses the user's configured OSD timeout." }
+        "id": {
+          "type": "string"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Milliseconds. 0 uses the user's configured OSD timeout."
+        }
       }
     },
-
     "shortcut": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false,
       "description": "A keybind, registered as the compositor global quickshell:<id>. The shell never edits the compositor config - `qs -c end4-pC ipc call plugins shortcuts` prints the exact line to paste.",
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9]*$" },
-        "description": { "type": "string" },
-        "suggestedKey": { "type": "string", "description": "Compositor syntax, e.g. \"SUPER SHIFT, B\". A suggestion printed to the user, not something the shell binds." },
-        "ipc": { "$ref": "#/definitions/ipcCall" },
-        "exec": { "$ref": "#/definitions/argv" }
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "suggestedKey": {
+          "type": "string",
+          "description": "Compositor syntax, e.g. \"SUPER SHIFT, B\". A suggestion printed to the user, not something the shell binds."
+        },
+        "ipc": {
+          "$ref": "#/definitions/ipcCall"
+        },
+        "exec": {
+          "$ref": "#/definitions/argv"
+        }
       }
     },
-
     "ipcCall": {
       "type": "object",
-      "required": ["target", "function"],
+      "required": [
+        "target",
+        "function"
+      ],
       "additionalProperties": false,
       "description": "Calls a function on a PluginIpc, in-process. Cheaper and more capable than spawning a command.",
       "properties": {
-        "target": { "type": "string", "description": "The PluginIpc's target, which defaults to the plugin id." },
-        "function": { "type": "string" },
-        "args": { "type": "array", "description": "Positional arguments." }
+        "target": {
+          "type": "string",
+          "description": "The PluginIpc's target, which defaults to the plugin id."
+        },
+        "function": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "description": "Arguments, with the substitutions $menuX, $menuY and $screen available in a context menu row."
+        }
       }
     },
-
     "argv": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "minItems": 1,
       "description": "A command as a list, never a shell string: [\"notify-send\", \"hi\"]. Each element is one argument, so nothing in it is ever interpreted by a shell."
     },
-
     "appearanceColor": {
       "type": "string",
       "description": "A colour role name understood by Appearance.getColorFromName.",
-      "examples": ["primary", "primaryContainer", "secondaryContainer", "tertiaryContainer", "surfaceContainer", "errorContainer"]
+      "examples": [
+        "primary",
+        "primaryContainer",
+        "secondaryContainer",
+        "tertiaryContainer",
+        "surfaceContainer",
+        "errorContainer"
+      ]
     },
-
     "setting": {
       "type": "object",
-      "required": ["key", "type"],
+      "required": [
+        "key",
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "key": {
@@ -305,55 +586,181 @@
           "pattern": "^[a-z][a-zA-Z0-9]*$",
           "description": "Becomes a QML property, so it must be a valid identifier and cannot be a QML reserved word (data, children, parent, objectName, state, visible, enabled...). PluginConfig refuses and warns about the ones that would not work."
         },
-        "type": { "enum": ["bool", "int", "real", "string", "enum", "color"] },
-        "label": { "type": "string", "description": "Shown next to the control. Defaults to the key." },
-        "description": { "type": "string", "description": "Dim line under the control." },
-        "icon": { "$ref": "#/definitions/materialSymbol" },
-        "placeholder": { "type": "string", "description": "Greyed hint inside an empty text field. string type only." },
-        "group": { "type": "string", "description": "Settings sharing a group are rendered as one titled block, in the order the groups first appear. Ungrouped settings come first." },
-        "default": { "description": "Required in practice: a setting with no default reads as an empty value of its type." },
-        "min": { "type": "number", "description": "int and real only." },
-        "max": { "type": "number", "description": "int and real only." },
-        "step": { "type": "number", "description": "int and real only." },
+        "type": {
+          "enum": [
+            "bool",
+            "int",
+            "real",
+            "string",
+            "enum",
+            "color"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "description": "Shown next to the control. Defaults to the key."
+        },
+        "description": {
+          "type": "string",
+          "description": "Dim line under the control."
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Greyed hint inside an empty text field. string type only."
+        },
+        "group": {
+          "type": "string",
+          "description": "Settings sharing a group are rendered as one titled block, in the order the groups first appear. Ungrouped settings come first."
+        },
+        "default": {
+          "description": "Required in practice: a setting with no default reads as an empty value of its type."
+        },
+        "min": {
+          "type": "number",
+          "description": "int and real only."
+        },
+        "max": {
+          "type": "number",
+          "description": "int and real only."
+        },
+        "step": {
+          "type": "number",
+          "description": "int and real only."
+        },
         "options": {
           "type": "array",
           "description": "enum only. Either plain strings, or { value, label } for a nicer control.",
           "items": {
             "oneOf": [
-              { "type": "string" },
+              {
+                "type": "string"
+              },
               {
                 "type": "object",
-                "required": ["value"],
+                "required": [
+                  "value"
+                ],
                 "additionalProperties": false,
                 "properties": {
-                  "value": { "type": "string" },
-                  "label": { "type": "string" },
-                  "icon": { "$ref": "#/definitions/materialSymbol" }
+                  "value": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "$ref": "#/definitions/materialSymbol"
+                  }
                 }
               }
             ]
           }
         }
       },
-
       "allOf": [
         {
-          "if": { "properties": { "type": { "const": "enum" } }, "required": ["type"] },
-          "then": { "required": ["options"] }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "enum"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "options"
+            ]
+          }
         },
         {
-          "if": { "properties": { "type": { "const": "bool" } }, "required": ["type"] },
-          "then": { "properties": { "default": { "type": "boolean" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "const": "bool"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "default": {
+                "type": "boolean"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["int", "real"] } }, "required": ["type"] },
-          "then": { "properties": { "default": { "type": "number" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "int",
+                  "real"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "default": {
+                "type": "number"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "type": { "enum": ["string", "enum", "color"] } }, "required": ["type"] },
-          "then": { "properties": { "default": { "type": "string" } } }
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "enum",
+                  "color"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "default": {
+                "type": "string"
+              }
+            }
+          }
         }
       ]
+    },
+    "panelAction": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "description": "Opens a panel by id. Arguments may use the substitutions $menuX, $menuY and $screen, which resolve to where the menu was opened.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Panel id, as declared by a manifest panels entry or by PanelRegistry built-ins."
+        },
+        "args": {
+          "type": "object",
+          "description": "Passed to PanelRegistry.open and readable as PanelRegistry.state(id).args."
+        }
+      }
     }
   }
 }

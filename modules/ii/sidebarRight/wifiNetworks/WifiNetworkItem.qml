@@ -5,6 +5,7 @@ import qs.services
 import qs.services.network
 import QtQuick
 import QtQuick.Layouts
+import qs.core
 
 DialogListItem {
     id: root
@@ -106,7 +107,7 @@ DialogListItem {
                     colRipple: Appearance.colors.colLayer4Active
                     onClicked: {
                         Network.openPublicWifiPortal()
-                        GlobalStates.sidebarRightOpen = false
+                        PanelRegistry.close("sidebarRight")
                     }
                 }
             }

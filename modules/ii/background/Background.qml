@@ -428,18 +428,24 @@ Variants {
                         return
                     }
 
-                    if (drop.urls.length === 1) {
-                        const path = CF.FileUtils.trimFileProtocol(decodeURIComponent(drop.urls[0].toString()))
-                        const validExt = /\.(png|jpe?g|webp|bmp|gif)$/i.test(path)
-                        if (validExt) {
-                            Wallpapers.select(path, Appearance.m3colors.darkmode)
-                        } else {
-                            const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y)
-                            DropShelf.show(drop.urls, globalPos.x, globalPos.y)
-                        }
+                    const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y)
+                    const paths = drop.urls.map(url => CF.FileUtils.trimFileProtocol(decodeURIComponent(url.toString())))
+
+                    // A single image dropped on the desktop is a wallpaper - that much the desktop
+                    // does know about itself. Anything else is announced and left to whoever is
+                    // listening: core must not call into a plugin, so it publishes the drop instead
+                    // of knowing that a drop shelf exists.
+                    const single = paths.length === 1 && /\.(png|jpe?g|webp|bmp|gif)$/i.test(paths[0])
+                    if (single) {
+                        Wallpapers.select(paths[0], Appearance.m3colors.darkmode)
                     } else {
-                        const globalPos = wallpaperDropArea.mapToGlobal(drop.x, drop.y)
-                        DropShelf.show(drop.urls, globalPos.x, globalPos.y)
+                        PluginBus.emit("desktop:filesDropped", {
+                            urls: drop.urls.map(url => url.toString()),
+                            paths: paths,
+                            x: globalPos.x,
+                            y: globalPos.y,
+                            screen: bgRoot.screen?.name ?? ""
+                        })
                     }
                     drop.accept()
                     wallpaperDropArea.currentUrls = []
@@ -542,10 +548,13 @@ Variants {
                 z: -2
                 acceptedButtons: Qt.RightButton
                 onClicked: (mouse) => {
-                    GlobalStates.desktopMenuScreen = bgRoot.screen
-                    GlobalStates.desktopMenuX = mouse.x
-                    GlobalStates.desktopMenuY = mouse.y
-                    GlobalStates.desktopMenuOpen = true
+                    // Where the click happened travels with the open request; core does not keep
+                    // a desktopMenuX/Y pair on behalf of a plugin it should not know about.
+                    PanelRegistry.open("desktopMenu", {
+                        screen: bgRoot.screen,
+                        x: mouse.x,
+                        y: mouse.y
+                    })
                 }
             }
         }

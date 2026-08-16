@@ -95,16 +95,28 @@ ContentPage {
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: PluginRegistry.all.length === 0 ? Translation.tr("Nothing in %1").arg(PluginRegistry.pluginsDir) : Translation.tr("%1 installed, %2 on").arg(PluginRegistry.all.length).arg(PluginRegistry.activeIds.length)
+                        text: PluginRegistry.all.length === 0 ? Translation.tr("Nothing on %1").arg(PluginRegistry.pluginPaths.join(", ")) : Translation.tr("%1 installed, %2 on").arg(PluginRegistry.all.length).arg(PluginRegistry.activeIds.length)
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Appearance.colors.colSubtext
                         elide: Text.ElideRight
+                        StyledToolTip {
+                            // Which directory a plugin came from decides whether editing it
+                            // survives a rebuild, so the paths are worth showing in full.
+                            text: PluginRegistry.pluginPaths.map((path, index) => `${index + 1}. ${path}`).join("\n")
+                        }
                     }
 
                     IconToolbarButton {
                         text: "folder_open"
-                        onClicked: Qt.openUrlExternally(`file://${PluginRegistry.pluginsDir}`)
-                        StyledToolTip { text: Translation.tr("Open the plugin folder") }
+                        // The user directory: the one a plugin can be dropped into without a
+                        // rebuild. Created on demand, because opening a missing folder does
+                        // nothing at all and looks like a broken button.
+                        onClicked: {
+                            const userDir = PluginRegistry.userPluginsDir;
+                            PluginUtils.exec(["mkdir", "-p", userDir]);
+                            Qt.openUrlExternally(`file://${userDir}`);
+                        }
+                        StyledToolTip { text: Translation.tr("Open %1").arg(PluginRegistry.userPluginsDir) }
                     }
                 }
 

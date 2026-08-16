@@ -8,15 +8,16 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: screenCorners
     readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
 
     property var actionForCorner: ({
-        [RoundCorner.CornerEnum.TopLeft]: () => GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen,
+        [RoundCorner.CornerEnum.TopLeft]: () => PanelRegistry.toggle("sidebarLeft"),
         [RoundCorner.CornerEnum.BottomLeft]: () => GlobalStates.toggleState(Config.options.sidebar.cornerOpen.bottomLeftAction),
-        [RoundCorner.CornerEnum.TopRight]: () => GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen,
+        [RoundCorner.CornerEnum.TopRight]: () => PanelRegistry.toggle("sidebarRight"),
         [RoundCorner.CornerEnum.BottomRight]: () => GlobalStates.toggleState(Config.options.sidebar.cornerOpen.bottomRightAction)
     })
 
@@ -122,9 +123,9 @@ Scope {
                         if (!Config.options.sidebar.cornerOpen.valueScroll)
                             return;
                         if (cornerWidget.isLeft)
-                            GlobalStates.osdBrightnessOpen = false;
+                            PanelRegistry.state("onScreenDisplay").open = false;
                         else
-                            GlobalStates.osdVolumeOpen = false;
+                            PanelRegistry.close("onScreenDisplay");
                     }
 
                     Loader {

@@ -5,6 +5,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
+import qs.core
 
 QuickToggleModel {
     name: Translation.tr("EasyEffects")
@@ -23,7 +24,7 @@ QuickToggleModel {
 
     altAction: () => {
         Quickshell.execDetached(["bash", "-c", "flatpak run com.github.wwmm.easyeffects || easyeffects"])
-        GlobalStates.sidebarRightOpen = false
+        PanelRegistry.close("sidebarRight")
     }
 
     tooltipText: Translation.tr("EasyEffects | Right-click to configure")

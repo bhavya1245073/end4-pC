@@ -6,12 +6,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: root
 
     function dismiss() {
-        GlobalStates.regionSelectorOpen = false
+        PanelRegistry.close("regionSelector")
     }
 
     property var action: RegionSelection.SnipAction.Copy
@@ -22,7 +23,7 @@ Scope {
         delegate: Loader {
             id: regionSelectorLoader
             required property var modelData
-            active: GlobalStates.regionSelectorOpen
+            active: PanelRegistry.state("regionSelector").open
 
             sourceComponent: RegionSelection {
                 screen: regionSelectorLoader.modelData
@@ -47,7 +48,7 @@ Scope {
         }
         root.action = RegionSelection.SnipAction.Copy
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
-        GlobalStates.regionSelectorOpen = true
+        PanelRegistry.open("regionSelector")
     }
 
     function search() {
@@ -57,13 +58,13 @@ Scope {
         } else {
             root.selectionMode = RegionSelection.SelectionMode.RectCorners
         }
-        GlobalStates.regionSelectorOpen = true
+        PanelRegistry.open("regionSelector")
     }
 
     function ocr() {
         root.action = RegionSelection.SnipAction.CharRecognition
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
-        GlobalStates.regionSelectorOpen = true
+        PanelRegistry.open("regionSelector")
     }
 
     function record() {
@@ -73,7 +74,7 @@ Scope {
         }
         root.action = RegionSelection.SnipAction.Record
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
-        GlobalStates.regionSelectorOpen = true
+        PanelRegistry.open("regionSelector")
     }
 
     function recordWithSound() {
@@ -83,7 +84,7 @@ Scope {
         }
         root.action = RegionSelection.SnipAction.RecordWithSound
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
-        GlobalStates.regionSelectorOpen = true
+        PanelRegistry.open("regionSelector")
     }
 
     IpcHandler {

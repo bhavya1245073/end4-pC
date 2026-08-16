@@ -7,6 +7,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 RowLayout {
     id: root
@@ -69,7 +70,7 @@ RowLayout {
         Layout.topMargin: 4
         Layout.bottomMargin: 4
         implicitHeight: 40
-        focus: GlobalStates.overviewOpen
+        focus: PanelRegistry.state("overview").open
         font.pixelSize: Appearance.font.pixelSize.small
         placeholderText: Translation.tr("Search, calculate or run")
         implicitWidth: root.searchingText == "" ? Appearance.sizes.searchWidthCollapsed : Appearance.sizes.searchWidth
@@ -111,7 +112,7 @@ RowLayout {
         Layout.topMargin: 4
         Layout.bottomMargin: 4
         onClicked: {
-            GlobalStates.overviewOpen = false;
+            PanelRegistry.close("overview");
             Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "search"]);
         }
         text: "image_search"

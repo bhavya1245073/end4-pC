@@ -17,14 +17,17 @@ import qs.modules.common.functions
 PanelWindow {
     id: shelfRoot
 
-    visible: GlobalStates.dropShelfOpen
+    visible: PanelRegistry.state("dropover").open
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell:dropshelf"
     color: "transparent"
 
-    property real posX: Math.max(20, GlobalStates.dropShelfX - implicitWidth / 2)
-    property real posY: Math.max(20, GlobalStates.dropShelfY - implicitHeight - 30)
+    // Where it was dropped, from the open request. Defaults to the middle of the screen for an
+    // open with no arguments - `qs ipc call dropover show`, for instance.
+    readonly property var openArgs: PanelRegistry.state("dropover").args
+    property real posX: Math.max(20, (shelfRoot.openArgs.x ?? Screen.width / 2) - implicitWidth / 2)
+    property real posY: Math.max(20, (shelfRoot.openArgs.y ?? Screen.height / 2) - implicitHeight - 30)
 
     anchors { top: true; left: true }
     margins {
@@ -37,11 +40,14 @@ PanelWindow {
 
     // Re-anchor to drop location on open
     Connections {
-        target: GlobalStates
-        function onDropShelfOpenChanged() {
-            if (GlobalStates.dropShelfOpen) {
-                shelfRoot.posX = Math.max(20, Math.min(Screen.width - shelfRoot.implicitWidth - 20, GlobalStates.dropShelfX - shelfRoot.implicitWidth / 2));
-                shelfRoot.posY = Math.max(20, Math.min(Screen.height - shelfRoot.implicitHeight - 40, GlobalStates.dropShelfY - shelfRoot.implicitHeight - 30));
+        target: PanelRegistry.state("dropover")
+        function onOpenChanged() {
+            if (PanelRegistry.state("dropover").open) {
+                const args = PanelRegistry.state("dropover").args;
+                const wantedX = args.x ?? Screen.width / 2;
+                const wantedY = args.y ?? Screen.height / 2;
+                shelfRoot.posX = Math.max(20, Math.min(Screen.width - shelfRoot.implicitWidth - 20, wantedX - shelfRoot.implicitWidth / 2));
+                shelfRoot.posY = Math.max(20, Math.min(Screen.height - shelfRoot.implicitHeight - 40, wantedY - shelfRoot.implicitHeight - 30));
             }
         }
     }
@@ -82,7 +88,7 @@ PanelWindow {
                     drop.accepted = false;
                     return;
                 }
-                DropShelf.addItems(drop.urls);
+                DropShelfState.addItems(drop.urls);
                 drop.accept();
             }
         }
@@ -145,7 +151,7 @@ PanelWindow {
 
                     // Count Badge
                     Rectangle {
-                        visible: DropShelf.items.length > 0
+                        visible: DropShelfState.items.length > 0
                         implicitHeight: 22
                         implicitWidth: countText.implicitWidth + 14
                         radius: Theme.radius.full
@@ -154,7 +160,7 @@ PanelWindow {
                         StyledText {
                             id: countText
                             anchors.centerIn: parent
-                            text: `${DropShelf.items.length}`
+                            text: `${DropShelfState.items.length}`
                             font.pixelSize: Theme.font.xs
                             font.weight: Font.DemiBold
                             color: Theme.onAccentMuted
@@ -169,7 +175,7 @@ PanelWindow {
 
                         // Copy Button
                         Rectangle {
-                            visible: DropShelf.items.length > 0
+                            visible: DropShelfState.items.length > 0
                             implicitWidth: 28
                             implicitHeight: 28
                             radius: Theme.radius.full
@@ -184,12 +190,12 @@ PanelWindow {
                                 color: copyHov.containsMouse ? Theme.accent : Theme.textDim
                             }
                             HoverHandler { id: copyHov }
-                            TapHandler { onTapped: DropShelf.copyAll() }
+                            TapHandler { onTapped: DropShelfState.copyAll() }
                         }
 
                         // Clear Button
                         Rectangle {
-                            visible: DropShelf.items.length > 0
+                            visible: DropShelfState.items.length > 0
                             implicitWidth: 28
                             implicitHeight: 28
                             radius: Theme.radius.full
@@ -204,7 +210,7 @@ PanelWindow {
                                 color: clearHov.containsMouse ? Theme.accent : Theme.textDim
                             }
                             HoverHandler { id: clearHov }
-                            TapHandler { onTapped: DropShelf.clear() }
+                            TapHandler { onTapped: DropShelfState.clear() }
                         }
 
                         // Close Button
@@ -223,7 +229,7 @@ PanelWindow {
                                 color: closeHov.containsMouse ? Theme.accent : Theme.textDim
                             }
                             HoverHandler { id: closeHov }
-                            TapHandler { onTapped: DropShelf.hide() }
+                            TapHandler { onTapped: DropShelfState.hide() }
                         }
                     }
                 }
@@ -233,7 +239,7 @@ PanelWindow {
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 120
-                visible: DropShelf.items.length > 0
+                visible: DropShelfState.items.length > 0
 
                 ListView {
                     id: fileListView
@@ -241,7 +247,7 @@ PanelWindow {
                     orientation: ListView.Horizontal
                     spacing: 10
                     clip: true
-                    model: DropShelf.items
+                    model: DropShelfState.items
 
                     WheelHandler {
                         target: fileListView
@@ -359,9 +365,9 @@ PanelWindow {
                                 TapHandler {
                                     id: removeTap
                                     onTapped: {
-                                        DropShelf.items = DropShelf.items.filter((_, i) => i !== cardDelegate.index);
-                                        if (DropShelf.items.length === 0) {
-                                            DropShelf.hide();
+                                        DropShelfState.items = DropShelfState.items.filter((_, i) => i !== cardDelegate.index);
+                                        if (DropShelfState.items.length === 0) {
+                                            DropShelfState.hide();
                                         }
                                     }
                                 }
@@ -405,7 +411,7 @@ PanelWindow {
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
-                visible: DropShelf.items.length === 0
+                visible: DropShelfState.items.length === 0
 
                 ColumnLayout {
                     anchors.centerIn: parent

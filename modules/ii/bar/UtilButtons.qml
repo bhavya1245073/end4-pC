@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
+import qs.core
 
 Item {
     id: root
@@ -166,13 +167,13 @@ Item {
             id: keyboardM3
             UtilButton {
                 iconText: "keyboard"
-                onClicked: GlobalStates.oskOpen = !GlobalStates.oskOpen
+                onClicked: PanelRegistry.toggle("onScreenKeyboard")
             }
         }
         Component {
             id: legacyKeyboard
             CircleUtilButton {
-                onClicked: GlobalStates.oskOpen = !GlobalStates.oskOpen
+                onClicked: PanelRegistry.toggle("onScreenKeyboard")
                 MaterialSymbol {
                     horizontalAlignment: Qt.AlignHCenter
                     fill: 0; text: "keyboard"
@@ -191,13 +192,13 @@ Item {
             id: wallpaperM3
             UtilButton {
                 iconText: "imagesmode"
-                onClicked: GlobalStates.wallpaperSelectorOpen = !GlobalStates.wallpaperSelectorOpen
+                onClicked: PanelRegistry.toggle("wallpaperSelector")
             }
         }
         Component {
             id: legacyWallpaper
             CircleUtilButton {
-                onClicked: GlobalStates.wallpaperSelectorOpen = !GlobalStates.wallpaperSelectorOpen
+                onClicked: PanelRegistry.toggle("wallpaperSelector")
                 MaterialSymbol {
                     horizontalAlignment: Qt.AlignHCenter
                     fill: 0; text: "imagesmode"

@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope { // Scope
     id: root
@@ -93,12 +94,12 @@ Scope { // Scope
             property bool reallyVisible: false
             visible: reallyVisible
 
-            Component.onCompleted: reallyVisible = GlobalStates.sidebarLeftOpen
+            Component.onCompleted: reallyVisible = PanelRegistry.state("sidebarLeft").open
 
             Connections {
-                target: GlobalStates
-                function onSidebarLeftOpenChanged() {
-                    if (GlobalStates.sidebarLeftOpen) {
+                target: PanelRegistry.state("sidebarLeft")
+                function onOpenChanged() {
+                    if (PanelRegistry.state("sidebarLeft").open) {
                         closeAnimTimer.stop();
                         panelWindow.reallyVisible = true;
                     } else if (panelWindow.animatedEntrance) {
@@ -120,7 +121,7 @@ Scope { // Scope
             property var contentParent: sidebarLeftBackground
 
             function hide() {
-                GlobalStates.sidebarLeftOpen = false
+                PanelRegistry.close("sidebarLeft")
             }
 
             exclusionMode: ExclusionMode.Normal
@@ -212,7 +213,7 @@ Scope { // Scope
                 radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
 
                 readonly property bool animatedEntrance: panelWindow.animatedEntrance
-                readonly property bool sidebarOpen: GlobalStates.sidebarLeftOpen
+                readonly property bool sidebarOpen: PanelRegistry.state("sidebarLeft").open
                 x: Appearance.sizes.hyprlandGapsOut - (animatedEntrance && !sidebarOpen ? width : 0)
 
                 Behavior on x {
@@ -267,9 +268,9 @@ Scope { // Scope
             property var contentParent: detachedSidebarBackground
             color: "transparent"
 
-            visible: GlobalStates.sidebarLeftOpen
+            visible: PanelRegistry.state("sidebarLeft").open
             onVisibleChanged: {
-                if (!visible) GlobalStates.sidebarLeftOpen = false;
+                if (!visible) PanelRegistry.close("sidebarLeft");
             }
             
             Rectangle {
@@ -293,15 +294,15 @@ Scope { // Scope
         target: "sidebarLeft"
 
         function toggle(): void {
-            GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen
+            PanelRegistry.toggle("sidebarLeft")
         }
 
         function close(): void {
-            GlobalStates.sidebarLeftOpen = false
+            PanelRegistry.close("sidebarLeft")
         }
 
         function open(): void {
-            GlobalStates.sidebarLeftOpen = true
+            PanelRegistry.open("sidebarLeft")
         }
     }
 
@@ -310,7 +311,7 @@ Scope { // Scope
         description: "Toggles left sidebar on press"
 
         onPressed: {
-            GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
+            PanelRegistry.toggle("sidebarLeft");
         }
     }
 
@@ -319,7 +320,7 @@ Scope { // Scope
         description: "Opens left sidebar on press"
 
         onPressed: {
-            GlobalStates.sidebarLeftOpen = true;
+            PanelRegistry.open("sidebarLeft");
         }
     }
 
@@ -328,7 +329,7 @@ Scope { // Scope
         description: "Closes left sidebar on press"
 
         onPressed: {
-            GlobalStates.sidebarLeftOpen = false;
+            PanelRegistry.close("sidebarLeft");
         }
     }
 

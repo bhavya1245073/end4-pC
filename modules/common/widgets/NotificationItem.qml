@@ -7,6 +7,7 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Services.Notifications
+import qs.core
 
 Item { // Notification item area
     id: root
@@ -202,7 +203,7 @@ Item { // Notification item area
 
                     onLinkActivated: (link) => {
                         Qt.openUrlExternally(link)
-                        GlobalStates.sidebarRightOpen = false
+                        PanelRegistry.close("sidebarRight")
                     }
                     
                     PointingHandLinkHover {}

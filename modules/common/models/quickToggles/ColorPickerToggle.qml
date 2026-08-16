@@ -5,6 +5,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.functions
 import qs.modules.common.widgets
+import qs.core
 
 QuickToggleModel {
     name: Translation.tr("Color picker")
@@ -13,7 +14,7 @@ QuickToggleModel {
     icon: "colorize"
 
     mainAction: () => {
-        GlobalStates.sidebarRightOpen = false;
+        PanelRegistry.close("sidebarRight");
         delayedActionTimer.start();
     }
     Timer {

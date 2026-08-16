@@ -6,6 +6,7 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.services
 import qs
+import qs.core
 
 MouseArea {
     id: root
@@ -27,7 +28,7 @@ MouseArea {
     padding: Appearance.sizes.wallpaperSelectorItemPadding
     hoverEnabled: true
     onClicked: {
-        if (GlobalStates.wallpaperSelectorTarget === "lockWall" || !Config.options.background.enableWallpaperPreview)
+        if (PanelRegistry.state("wallpaperSelector").args.target === "lockWall" || !Config.options.background.enableWallpaperPreview)
             root.activated()
         else
             root.previewRequested()

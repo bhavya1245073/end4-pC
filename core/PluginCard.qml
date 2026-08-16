@@ -67,6 +67,19 @@ Rectangle {
         onClicked: root.clicked()
     }
 
+    // An interactive card rises a little under the pointer and settles when pressed. Scale rather
+    // than a shadow: a layer-shell surface cannot cast one outside its own bounds, so a shadow on a
+    // card inside a panel would be clipped, and 1.5% of scale reads as "this responds" without
+    // moving neighbours.
+    scale: !root.interactive ? 1 : mouse.containsPress ? 0.985 : mouse.containsMouse ? 1.015 : 1
+    Behavior on scale {
+        NumberAnimation {
+            duration: mouse.containsPress ? Theme.motion.instant : Theme.motion.fast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Theme.motion.spatialFast
+        }
+    }
+
     GridLayout {
         id: body
 

@@ -137,7 +137,7 @@ Singleton {
         for (const entry of PluginRegistry.launcherActions) {
             if (!entry.id)
                 continue;
-            const command = Array.isArray(entry.exec) ? entry.exec.slice() : entry.script ? [`${PluginRegistry.pluginsDir}/${entry.pluginId}/${entry.script}`] : null;
+            const command = Array.isArray(entry.exec) ? entry.exec.slice() : entry.script ? [`${PluginRegistry.dirOf(entry.pluginId)}/${entry.script}`] : null;
             if (!command)
                 continue;
             actions.push({
@@ -489,7 +489,7 @@ Singleton {
                     iconName: "settings",
                     iconType: LauncherSearchResult.IconType.Material,
                     execute: () => {
-                        GlobalStates.settingsOpen = true;
+                        PanelRegistry.open("settings");
                         Qt.callLater(() => {
                             GlobalStates.settingsPage = page.page + ":" + query;
                         });

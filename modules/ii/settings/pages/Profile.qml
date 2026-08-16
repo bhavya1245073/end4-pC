@@ -10,6 +10,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 import qs.modules.common.models
+import qs.core
 
 ContentPage {
     id: page
@@ -84,7 +85,7 @@ ContentPage {
                     confirmButtonVisible: Config.options.profile.avatarPath !== ""
                     confirmButtonIcon: "add"
                     onConfirmClicked: {
-                        GlobalStates.settingsOpen = false
+                        PanelRegistry.close("settings")
                         if (Config.options.profile.avatarPath !== "") {
                             Quickshell.execDetached(["dolphin", Config.options.profile.avatarPath])
                         }

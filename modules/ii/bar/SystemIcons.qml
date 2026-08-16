@@ -7,6 +7,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 Item {
     id: root
@@ -21,7 +22,7 @@ Item {
     MouseArea {
         anchors.fill: parent
         onPressed: {
-            GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+            PanelRegistry.toggle("sidebarRight");
         }
     }
 

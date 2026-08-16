@@ -4,6 +4,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 RippleButton {
     id: root
@@ -20,10 +21,10 @@ RippleButton {
     colBackgroundToggled: "transparent"
     colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
     colRippleToggled: Appearance.colors.colSecondaryContainerActive
-    toggled: GlobalStates.overviewOpen
+    toggled: PanelRegistry.state("overview").open
 
     onPressed: {
-        GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+        PanelRegistry.toggle("overview");
     }
 
     MaterialSymbol {

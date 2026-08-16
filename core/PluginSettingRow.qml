@@ -2,6 +2,11 @@
 //
 // Plugins get a working GUI from JSON alone - no QML required. A plugin that
 // wants more than this can still ship a full `settingsPages` entry.
+//
+// The same renderer backs PluginForm, which uses a row for a value that is not a declared
+// setting - a search field, a scratch value in PluginStorage, a property of the plugin itself.
+// That is what `read` and `write` are for: leave them alone and the row reads and writes the
+// plugin's settings; set them and the row is a control over anything.
 
 import QtQuick
 import QtQuick.Layouts
@@ -16,13 +21,21 @@ Rectangle {
     required property int index
     required property int count
 
-    readonly property var value: PluginConfig.value(root.pluginId, root.spec.key)
+    // Optional overrides. `read` is a function of no arguments returning the current value;
+    // `write` takes the new value. Both null means "this is a plugin setting".
+    property var read: null
+    property var write: null
+
+    readonly property var value: root.read ? root.read() : PluginConfig.value(root.pluginId, root.spec.key)
     readonly property string label: root.spec.label ?? root.spec.key
     readonly property bool isFirst: root.index === 0
     readonly property bool isLast: root.index === root.count - 1
 
     function commit(newValue) {
-        PluginConfig.set(root.pluginId, root.spec.key, newValue);
+        if (root.write)
+            root.write(newValue);
+        else
+            PluginConfig.set(root.pluginId, root.spec.key, newValue);
     }
 
     Layout.fillWidth: true

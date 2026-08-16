@@ -7,6 +7,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import ".."
+import qs.core
 
 StyledOverlayWidget {
     id: root
@@ -30,7 +31,7 @@ StyledOverlayWidget {
                     materialSymbol: "screenshot_region"
                     name: "Screenshot region"
                     onClicked: {
-                        GlobalStates.overlayOpen = false;
+                        PanelRegistry.close("overlay");
                         Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "screenshot"]);
                     }
                 }
@@ -39,7 +40,7 @@ StyledOverlayWidget {
                     materialSymbol: "photo_camera"
                     name: "Screenshot"
                     onClicked: {
-                        GlobalStates.overlayOpen = false;
+                        PanelRegistry.close("overlay");
                         Quickshell.execDetached(["bash", "-c", "grim - | wl-copy"]);
                     }
                 }
@@ -48,7 +49,7 @@ StyledOverlayWidget {
                     materialSymbol: "screen_record"
                     name: "Record region"
                     onClicked: {
-                        GlobalStates.overlayOpen = false;
+                        PanelRegistry.close("overlay");
                         Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "region", "recordWithSound"]);
                     }
                 }
@@ -57,7 +58,7 @@ StyledOverlayWidget {
                     materialSymbol: "capture"
                     name: "Record screen"
                     onClicked: {
-                        GlobalStates.overlayOpen = false;
+                        PanelRegistry.close("overlay");
                         Quickshell.execDetached([Directories.recordScriptPath, "--fullscreen", "--sound"]);
                     }
                 }
@@ -71,7 +72,7 @@ StyledOverlayWidget {
                 colBackgroundHover: Appearance.colors.colLayer3Hover
                 colRipple: Appearance.colors.colLayer3Active
                 onClicked: {
-                    GlobalStates.overlayOpen = false;
+                    PanelRegistry.close("overlay");
                     Qt.openUrlExternally(`file://${Config.options.screenRecord.savePath}`);
                 }
                 contentItem: Row {

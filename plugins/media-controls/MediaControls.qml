@@ -11,6 +11,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: root
@@ -77,35 +78,23 @@ Scope {
         return filtered;
     }
 
-    Process {
-        id: cavaProc
-        running: (GlobalStates.mediaControlsOpen ||
-            GlobalStates.sidebarRightOpen || 
-            Config.options.bar.layouts.leftLayout.includes("visualizer") ||
-            Config.options.bar.layouts.middleLayout.includes("visualizer") ||
-            Config.options.bar.layouts.rightLayout.includes("visualizer") ||
-            Config.options.background.widgets.visualizer.enable)
-            && MprisController.activePlayer !== null
-        onRunningChanged: {
-            if (!cavaProc.running) {
-                GlobalStates.visualizerPoints = [];
-            }
-        }
-        command: ["cava", "-p", `${FileUtils.trimFileProtocol(Directories.scriptPath)}/cava/raw_output_config.txt`]
-        stdout: SplitParser {
-            onRead: data => {
-                let points = data.split(";").map(p => parseFloat(p.trim())).filter(p => !isNaN(p));
-                GlobalStates.visualizerPoints = points;
-            }
-        }
+    // The spectrum is PluginAudio.s job now, and cava runs while at least one PluginSpectrum exists.
+    //
+    // This used to be here: a plugin owning the analyser process, writing into a core global, and
+    // deciding whether to run by reading the bar layout configuration and looking for the string
+    // "visualizer" in it. Every widget that wanted a spectrum had to be named in this condition,
+    // which meant a plugin could not have one at all.
+    readonly property PluginSpectrum mediaSpectrum: PluginSpectrum {
+        // Only while this plugin is actually showing something - the panel or the sidebar.
+        active: PanelRegistry.state("mediaControls").open || PanelRegistry.state("sidebarRight").open
     }
 
     Loader {
         id: mediaControlsLoader
-        active: GlobalStates.mediaControlsOpen
+        active: PanelRegistry.state("mediaControls").open
         onActiveChanged: {
             if (!mediaControlsLoader.active && root.realPlayers.length === 0) {
-                GlobalStates.mediaControlsOpen = false;
+                PanelRegistry.close("mediaControls");
             }
         }
 
@@ -157,7 +146,7 @@ Scope {
                 target: GlobalFocusGrab
                 function onDismissed() {
                     if (!Config.options.bar.media.alwaysVisible)
-                        GlobalStates.mediaControlsOpen = false;
+                        PanelRegistry.close("mediaControls");
                 }
             }
 
@@ -173,7 +162,7 @@ Scope {
                     delegate: Player {
                         required property MprisPlayer modelData
                         player: modelData
-                        visualizerPoints: GlobalStates.visualizerPoints  
+                        visualizerPoints: mediaSpectrum.points
                         implicitWidth: root.widgetWidth
                         implicitHeight: showLyrics ? 290 : Appearance.sizes.mediaControlsHeight
                         radius: root.popupRounding
@@ -252,7 +241,7 @@ Scope {
         description: "Toggles media controls on press"
 
         onPressed: {
-            GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen;
+            PanelRegistry.toggle("mediaControls");
         }
     }
     CompositorGlobalShortcut {
@@ -260,7 +249,7 @@ Scope {
         description: "Opens media controls on press"
 
         onPressed: {
-            GlobalStates.mediaControlsOpen = true;
+            PanelRegistry.open("mediaControls");
         }
     }
     CompositorGlobalShortcut {
@@ -268,7 +257,7 @@ Scope {
         description: "Closes media controls on press"
 
         onPressed: {
-            GlobalStates.mediaControlsOpen = false;
+            PanelRegistry.close("mediaControls");
         }
     }
 }

@@ -9,6 +9,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Qt5Compat.GraphicalEffects
+import qs.core
 
 Rectangle {
     id: root
@@ -150,7 +151,7 @@ Rectangle {
             textFormat: Text.MarkdownText
             onLinkActivated: (link) => {
                 Qt.openUrlExternally(link)
-                GlobalStates.sidebarLeftOpen = false
+                PanelRegistry.close("sidebarLeft")
             }
             PointingHandLinkHover {}
         }

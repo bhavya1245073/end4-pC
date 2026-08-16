@@ -12,7 +12,7 @@ QtObject {
 
     required property string pluginId
 
-    readonly property string path: `${PluginRegistry.pluginsDir}/${root.pluginId}/manifest.json`
+    readonly property string path: `${PluginRegistry.dirOf(root.pluginId)}/manifest.json`
 
     function parse() {
         const raw = manifestFile.text();

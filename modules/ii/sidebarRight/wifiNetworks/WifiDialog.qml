@@ -6,6 +6,7 @@ import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import qs.core
 
 WindowDialog {
     id: root
@@ -51,7 +52,7 @@ WindowDialog {
             buttonText: Translation.tr("Details")
             onClicked: {
                 Quickshell.execDetached(["bash", "-c", `${Network.ethernet ? Config.options.apps.networkEthernet : Config.options.apps.network}`]);
-                GlobalStates.sidebarRightOpen = false;
+                PanelRegistry.close("sidebarRight");
             }
         }
 

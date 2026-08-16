@@ -12,6 +12,7 @@ import qs.modules.common.models.gCloud
 import qs.modules.common.utils
 import qs.modules.common.widgets
 import qs.services
+import qs.core
 
 Item {
     id: root
@@ -125,7 +126,7 @@ Item {
                 color: root.textColor
                 onLinkActivated: (link) => {
                     Qt.openUrlExternally(link)
-                    GlobalStates.screenTranslatorOpen = false
+                    PanelRegistry.close("screenTranslator")
                 }
 
                 PointingHandLinkHover {}

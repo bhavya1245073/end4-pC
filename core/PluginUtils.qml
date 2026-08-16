@@ -44,6 +44,19 @@ Singleton {
         Quickshell.clipboardText = text ?? "";
     }
 
+    // Copy with an explicit MIME type, for content that is not plain text: a list of file URIs a
+    // file manager will accept as a paste, an SVG, an HTML fragment.
+    //
+    //     PluginUtils.copyTyped(paths.map(p => `file://${p}`).join("\n"), "text/uri-list")
+    //
+    // This is the one clipboard operation that cannot be done in-process: Quickshell's clipboard
+    // is text/plain, and offering a different type means owning a Wayland data source. wl-copy is
+    // the tool that does that, invoked as argv with the payload as an argument - no shell, so no
+    // quoting hazard, whatever is in the text.
+    function copyTyped(text: string, mimeType: string): void {
+        Quickshell.execDetached(["wl-copy", "--type", mimeType ?? "text/plain", text ?? ""]);
+    }
+
     function paste(): string {
         return Quickshell.clipboardText ?? "";
     }
@@ -188,9 +201,9 @@ Singleton {
         Quickshell.execDetached(command.map(part => String(part)));
     }
 
-    // Same, but hands stdout back. `callback(text, exitCode)`. The Process is
-    // parented to this singleton and destroyed when it finishes, so a plugin
-    // cannot leak one by forgetting.
+    // Same, but hands the output back: `callback(stdout, exitCode, stderr)`. The Process is
+    // parented to this singleton and destroyed when it finishes, so a plugin cannot leak one
+    // by forgetting.
     function run(command: var, callback: var): void {
         if (!Array.isArray(command) || command.length === 0) {
             console.warn("[PluginUtils] run needs a non-empty list");
@@ -258,9 +271,13 @@ Singleton {
             id: proc
             property var handler: null
             stdout: StdioCollector {}
+            // Collected as well as stdout, because some tools write the answer there - fuser
+            // prints its pids to stderr - and because a callback that only ever sees an
+            // empty string cannot say *why* a command failed.
+            stderr: StdioCollector {}
             onExited: (exitCode, _status) => {
                 if (proc.handler)
-                    proc.handler(proc.stdout.text, exitCode);
+                    proc.handler(proc.stdout.text, exitCode, proc.stderr.text);
                 proc.destroy();
             }
         }

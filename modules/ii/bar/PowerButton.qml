@@ -3,6 +3,7 @@ import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.core
 
 RippleButton {
     id: root
@@ -19,7 +20,7 @@ RippleButton {
     colRipple: isMaterial ? Appearance.colors.colPrimaryActive : Appearance.colors.colLayer1Active
 
     onPressed: {
-        GlobalStates.sessionOpen = !GlobalStates.sessionOpen
+        PanelRegistry.toggle("sessionScreen")
     }
 
     MaterialSymbol {

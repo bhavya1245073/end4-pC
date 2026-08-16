@@ -34,6 +34,10 @@ Item {
     property bool enabled: true
     property bool checked: false
 
+    // A count or a dot in the corner. 0 hides it, which is what a live count usually is.
+    property int badge: 0
+    property bool badgeDot: false
+
     property color colIcon: root.checked ? Theme.onAccentBlock : Theme.text
     property color colBackground: root.checked ? Theme.accentBlock : (root.flat ? "transparent" : Theme.surfaceHigh)
 
@@ -68,6 +72,19 @@ Item {
             color: Theme.fade(root.colIcon, root.pressed ? Theme.state.press : Theme.state.hover)
         }
 
+        // Keyboard focus ring. Drawn outside the fill so it is visible on a checked button too,
+        // where a state layer would be lost against the accent.
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width + 6
+            height: parent.height + 6
+            radius: Theme.radius.full
+            color: "transparent"
+            border.width: 2
+            border.color: Theme.accent
+            visible: root.activeFocus
+        }
+
         Behavior on color {
             animation: Theme.anim.fast.colorAnimation.createObject(this)
         }
@@ -94,10 +111,27 @@ Item {
         font.pixelSize: Theme.font.s
     }
 
-    scale: root.pressed ? 0.92 : 1
-    Behavior on scale {
-        animation: Theme.anim.bounce.numberAnimation.createObject(this)
+    PluginBadge {
+        count: root.badge
+        dot: root.badgeDot
     }
+
+    // Grows a little under the pointer and dips when pressed. Both are small on purpose: a button
+    // that jumps is noise, but a button that does nothing feels dead, and 6% is the difference.
+    scale: root.pressed ? 0.92 : (root.hovered && root.enabled ? 1.06 : 1)
+    Behavior on scale {
+        NumberAnimation {
+            duration: root.pressed ? Theme.motion.instant : Theme.motion.fast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.pressed ? Theme.motion.effects : Theme.motion.spatialFast
+        }
+    }
+
+    // Reachable by keyboard, and Space/Enter activate it - a button that only answers a mouse is
+    // not a button.
+    activeFocusOnTab: root.enabled
+    Keys.onSpacePressed: root.clicked()
+    Keys.onReturnPressed: root.clicked()
 
     HoverHandler {
         id: hoverHandler

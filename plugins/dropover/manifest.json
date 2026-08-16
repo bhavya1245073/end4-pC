@@ -14,6 +14,27 @@
                 "id": "dropover",
                 "entry": "DropShelfPanel.qml"
             }
+        ],
+        "contextMenuItems": [
+            {
+                "id": "shelf",
+                "label": "Drop Shelf",
+                "icon": "stacks",
+                "order": 30,
+                "badge": "dropover:count",
+                "panel": {
+                    "id": "dropover",
+                    "args": {
+                        "x": "$menuX",
+                        "y": "$menuY"
+                    }
+                }
+            }
+        ],
+        "ipc": [
+            {
+                "entry": "DropoverIpc.qml"
+            }
         ]
     }
 }

@@ -5,6 +5,7 @@ import qs.modules.common.widgets
 import qs.modules.common.functions
 import QtQuick
 import QtQuick.Layouts
+import qs.core
 
 RippleButton {
     id: root
@@ -25,7 +26,7 @@ RippleButton {
             url += ` -site:${site}`;
         }
         Qt.openUrlExternally(url);
-        GlobalStates.sidebarLeftOpen = false;
+        PanelRegistry.close("sidebarLeft");
     }
 
     contentItem: Item {

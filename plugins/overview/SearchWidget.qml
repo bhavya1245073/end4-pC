@@ -11,6 +11,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 Item { // Wrapper
     id: root
@@ -116,7 +117,7 @@ Item { // Wrapper
 
         Behavior on implicitHeight {
             id: searchHeightBehavior
-            enabled: GlobalStates.overviewOpen && root.showResults
+            enabled: PanelRegistry.state("overview").open && root.showResults
             animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
         }
 

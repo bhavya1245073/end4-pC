@@ -10,6 +10,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import "."
+import qs.core
 
 Scope {
     id: root
@@ -20,19 +21,19 @@ Scope {
     
     Loader {
         id: overlayLoader
-        active: GlobalStates.overlayOpen || OverlayContext.hasPinnedWidgets
+        active: PanelRegistry.state("overlay").open || OverlayContext.hasPinnedWidgets
         sourceComponent: PanelWindow {
             id: overlayWindow
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.namespace: "quickshell:overlay"
             WlrLayershell.layer: WlrLayer.Overlay
             // Use OnDemand for pinned widgets to allow focus switching with mouse clicks
-            WlrLayershell.keyboardFocus: GlobalStates.overlayOpen ? WlrKeyboardFocus.Exclusive : (OverlayContext.clickableWidgets.length > 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+            WlrLayershell.keyboardFocus: PanelRegistry.state("overlay").open ? WlrKeyboardFocus.Exclusive : (OverlayContext.clickableWidgets.length > 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
             visible: true
             color: "transparent"
 
             mask: Region {
-                item: GlobalStates.overlayOpen ? overlayContent : null
+                item: PanelRegistry.state("overlay").open ? overlayContent : null
                 regions: OverlayContext.clickableWidgets.map((widget) => regionComponent.createObject(this, {
                     item: widget
                 }));
@@ -50,13 +51,13 @@ Scope {
                 windows: [overlayWindow]
                 active: false
                 onCleared: () => {
-                    if (!active) GlobalStates.overlayOpen = false;
+                    if (!active) PanelRegistry.close("overlay");
                 }
             }
 
             Connections {
-                target: GlobalStates
-                function onOverlayOpenChanged() {
+                target: PanelRegistry.state("overlay")
+                function onOpenChanged() {
                     delayedGrabTimer.restart();
                 }
             }
@@ -65,7 +66,7 @@ Scope {
                 id: delayedGrabTimer
                 interval: Appearance.animation.elementMoveFast.duration
                 onTriggered: {
-                    grab.active = GlobalStates.overlayOpen;
+                    grab.active = PanelRegistry.state("overlay").open;
                 }
             }
 
@@ -80,7 +81,7 @@ Scope {
         target: "overlay"
 
         function toggle(): void {
-            GlobalStates.overlayOpen = !GlobalStates.overlayOpen;
+            PanelRegistry.toggle("overlay");
         }
     }
 
@@ -89,7 +90,7 @@ Scope {
         description: "Toggles overlay on press"
 
         onPressed: {
-            GlobalStates.overlayOpen = !GlobalStates.overlayOpen;
+            PanelRegistry.toggle("overlay");
         }
     }
 }

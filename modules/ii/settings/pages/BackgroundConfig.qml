@@ -88,8 +88,9 @@ ContentPage {
                         wheelEnabled: false
                         dragEnabled: false
                         clickAction: (index, modelData) => {
-                            GlobalStates.wallpaperSelectorTarget = index === 1 ? "lockWall" : "wallpaper"
-                            GlobalStates.wallpaperSelectorOpen = true
+                            // Which wallpaper this picker is choosing travels as a panel argument,
+                            // so core does not carry a property on the plugin.s behalf.
+                            PanelRegistry.open("wallpaperSelector", { target: index === 1 ? "lockWall" : "wallpaper" })
                         }
                     }
 
@@ -172,8 +173,7 @@ ContentPage {
                         wheelEnabled: false
                         dragEnabled: false
                         clickAction: (index, modelData) => {
-                            GlobalStates.wallpaperSelectorTarget = "wallpaper"
-                            GlobalStates.wallpaperSelectorOpen = true
+                            PanelRegistry.open("wallpaperSelector", { target: "wallpaper" })
                         }
                     }
 

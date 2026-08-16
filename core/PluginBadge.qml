@@ -79,4 +79,37 @@ Rectangle {
     Behavior on color {
         animation: Theme.anim.fast.colorAnimation.createObject(this)
     }
+
+    // Appearing, disappearing, and changing all get a moment of motion: the badge scales in from
+    // nothing rather than blinking into existence, and pulses when the number changes while it is
+    // already on screen. Without the pulse a 3 becoming a 4 is invisible.
+    scale: root.visible ? 1 : 0
+    Behavior on scale {
+        NumberAnimation {
+            duration: Theme.motion.medium
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Theme.motion.spatialFast
+        }
+    }
+
+    onLabelChanged: if (root.visible) pulse.restart()
+
+    SequentialAnimation {
+        id: pulse
+        NumberAnimation {
+            target: root
+            property: "scale"
+            to: 1.28
+            duration: Theme.motion.instant
+            easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: root
+            property: "scale"
+            to: 1
+            duration: Theme.motion.fast
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Theme.motion.spatialFast
+        }
+    }
 }

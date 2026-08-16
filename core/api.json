@@ -426,7 +426,7 @@
         }
       },
       "contextMenuItem": {
-        "description": "A row in the desktop right-click menu. Exactly one of ipc, exec or entry decides what it does.",
+        "description": "A row in the desktop right-click menu. Exactly one of ipc, panel, exec or entry decides what it does.",
         "required": [
           "id",
           "label"
@@ -452,7 +452,7 @@
           },
           "order": {
             "type": "integer",
-            "description": "Position among all rows. Built-ins sit at 10 (Wallpaper), 20 (Widgets), 30 (DropShelf), 40 (Live Wallpaper) and 100 (Settings).",
+            "description": "Position among all rows. The shell own rows sit at 10 (Wallpaper), 20 (Widgets) and 100 (Settings).",
             "default": 50,
             "enum": null
           },
@@ -471,6 +471,18 @@
           "entry": {
             "type": "#/definitions/qmlFile",
             "description": "A submenu the plugin draws itself, opened on hover.",
+            "default": null,
+            "enum": null
+          },
+          "panel": {
+            "type": "#/definitions/panelAction",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "badge": {
+            "type": "string",
+            "description": "A PluginBus topic whose retained value is shown at the right of the row, e.g. \"dropover:count\". Updates live while the menu is open.",
             "default": null,
             "enum": null
           }
@@ -562,7 +574,7 @@
           },
           "args": {
             "type": "array",
-            "description": "Positional arguments.",
+            "description": "Arguments, with the substitutions $menuX, $menuY and $screen available in a context menu row.",
             "default": null,
             "enum": null
           }
@@ -661,6 +673,26 @@
           "options": {
             "type": "array",
             "description": "enum only. Either plain strings, or { value, label } for a nicer control.",
+            "default": null,
+            "enum": null
+          }
+        }
+      },
+      "panelAction": {
+        "description": "Opens a panel by id. Arguments may use the substitutions $menuX, $menuY and $screen, which resolve to where the menu was opened.",
+        "required": [
+          "id"
+        ],
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "Panel id, as declared by a manifest panels entry or by PanelRegistry built-ins.",
+            "default": null,
+            "enum": null
+          },
+          "args": {
+            "type": "object",
+            "description": "Passed to PanelRegistry.open and readable as PanelRegistry.state(id).args.",
             "default": null,
             "enum": null
           }
@@ -930,6 +962,14 @@
         "doc": "Components, for `Behavior on x { animation: Theme.anim.fast.number... }`. Using these rather than a hand-written NumberAnimation is what makes a plugin move like the rest of the sh"
       },
       {
+        "kind": "property",
+        "name": "motion",
+        "type": "QtObject",
+        "readonly": true,
+        "default": "QtObject",
+        "doc": "Enter is slower than exit on purpose (400 against 200): something arriving has to be understood, something leaving only has to get out of the way."
+      },
+      {
         "kind": "function",
         "name": "fade",
         "args": "base: color, amount: real",
@@ -963,12 +1003,172 @@
         "args": "name: string",
         "returns": "color",
         "doc": "Anything from `Appearance` by role name, for the rare case this shortlist does not cover: Theme.role(\"colTertiaryHover\"). Returns transparent if unknown, so a typo is a visible mis"
+      },
+      {
+        "kind": "function",
+        "name": "createPaletteFromColor",
+        "args": "source: color, dark: var",
+        "returns": "var",
+        "doc": "Generating one is about ten milliseconds of arithmetic - six tonal palettes, twenty-seven gamut-mapped tones each. Fine on a track change, wrong per frame: cache it in a property."
+      },
+      {
+        "kind": "function",
+        "name": "createTonalPalette",
+        "args": "source: color",
+        "returns": "var",
+        "doc": "Just the ramp: { hue, chroma, tones: { 0..100 }, tone(n) }. For a widget that wants five shades of one colour rather than a whole scheme."
+      },
+      {
+        "kind": "function",
+        "name": "toneOf",
+        "args": "source: color",
+        "returns": "real",
+        "doc": "Perceptual lightness, 0..100 - the same axis the tones above are indexed by, so `Theme.toneOf(c) > 60` is a meaningful \"is this a light colour\"."
+      },
+      {
+        "kind": "function",
+        "name": "mostReadable",
+        "args": "background: color, candidates: var",
+        "returns": "color",
+        "doc": "The more readable of two colours on `background`, by WCAG contrast ratio."
       }
     ]
   },
   "core": {
     "summary": "Base types to inherit from, and singletons to call. Import qs.core.",
     "baseTypes": [
+      {
+        "name": "PanelState",
+        "kind": "type",
+        "extends": "QtObject",
+        "summary": "One panel's open state, as a declarative object.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "panel",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "Panel id, as declared in a manifest or by PanelRegistry's built-ins."
+          },
+          {
+            "kind": "property",
+            "name": "state",
+            "type": "var",
+            "readonly": true,
+            "default": "PanelRegistry.state(root.panel)"
+          },
+          {
+            "kind": "property",
+            "name": "open",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.state?.open ?? false"
+          },
+          {
+            "kind": "property",
+            "name": "args",
+            "type": "var",
+            "readonly": true,
+            "default": "root.state?.args ?? ({})",
+            "doc": "Whatever open() was called with. `{}` when opened without arguments."
+          },
+          {
+            "kind": "property",
+            "name": "openedAt",
+            "type": "real",
+            "readonly": true,
+            "default": "root.state?.at ?? 0",
+            "doc": "When it was last opened, as a millisecond timestamp - for a panel that behaves differently if it was just shown."
+          },
+          {
+            "kind": "signal",
+            "name": "opened",
+            "args": "var args"
+          },
+          {
+            "kind": "signal",
+            "name": "closed"
+          },
+          {
+            "kind": "function",
+            "name": "show",
+            "args": "args: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "hide",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "toggle",
+            "args": "args: var",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginAppear",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "Entrance animation for anything that appears: a card, a menu row, a popup, a list item.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "target",
+            "type": "Item",
+            "default": "root.parent",
+            "doc": "What to animate. Defaults to the parent, which is the usual case."
+          },
+          {
+            "kind": "property",
+            "name": "shown",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "index",
+            "type": "int",
+            "default": "-1",
+            "doc": "Position in a staggered group; -1 for no stagger."
+          },
+          {
+            "kind": "property",
+            "name": "from",
+            "type": "string",
+            "default": "\"up\"",
+            "doc": "Direction it comes from: \"up\" (rises), \"down\", \"left\", \"right\", \"none\"."
+          },
+          {
+            "kind": "property",
+            "name": "distance",
+            "type": "real",
+            "default": "Theme.motion.slideDistance"
+          },
+          {
+            "kind": "property",
+            "name": "scaleFrom",
+            "type": "real",
+            "default": "Theme.motion.enterScale"
+          },
+          {
+            "kind": "property",
+            "name": "scaled",
+            "type": "bool",
+            "default": "true",
+            "doc": "Off for something that should just fade."
+          },
+          {
+            "kind": "property",
+            "name": "animated",
+            "type": "bool",
+            "default": "true",
+            "doc": "Set false to place the item immediately, for a widget restored from a saved layout where an entrance animation would look like the shell is loading rather than the widget arriving."
+          }
+        ]
+      },
       {
         "name": "PluginBackgroundWidget",
         "kind": "type",
@@ -1255,6 +1455,39 @@
         ]
       },
       {
+        "name": "PluginBusListener",
+        "kind": "type",
+        "extends": "QtObject",
+        "summary": "Declarative subscription to a PluginBus topic, unsubscribed automatically when the widget goes away.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "topic",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "enabled",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "signal",
+            "name": "received",
+            "args": "var payload, string topic",
+            "doc": "(payload, topic) - the topic is passed too, which is what makes a wildcard subscription useful."
+          },
+          {
+            "kind": "property",
+            "name": "replayRetained",
+            "type": "bool",
+            "default": "false",
+            "doc": "Replays the retained value, if any, as soon as the subscription starts. Off by default: a listener that reacts to an event should not fire for one that already happened, but a list"
+          }
+        ]
+      },
+      {
         "name": "PluginCard",
         "kind": "type",
         "extends": "Rectangle",
@@ -1514,11 +1747,619 @@
         ]
       },
       {
+        "name": "PluginDialogHost",
+        "kind": "type",
+        "extends": "Scope",
+        "summary": "The window PluginDialogs draws into.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "dialog",
+            "type": "var",
+            "readonly": true,
+            "default": "PluginDialogs.current"
+          },
+          {
+            "kind": "property",
+            "name": "kind",
+            "type": "string",
+            "readonly": true,
+            "default": "root.dialog?.kind ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "options",
+            "type": "var",
+            "readonly": true,
+            "default": "root.dialog?.options ?? ({})"
+          }
+        ]
+      },
+      {
+        "name": "PluginDrawer",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A panel that slides in from an edge of the screen.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "edge",
+            "type": "string",
+            "default": "\"right\"",
+            "doc": "\"left\", \"right\", \"top\", \"bottom\"."
+          },
+          {
+            "kind": "property",
+            "name": "size",
+            "type": "real",
+            "default": "360",
+            "doc": "Width for left/right, height for top/bottom."
+          },
+          {
+            "kind": "property",
+            "name": "span",
+            "type": "real",
+            "default": "1",
+            "doc": "Fraction of the edge it covers, 0..1. 1 is the full edge."
+          },
+          {
+            "kind": "property",
+            "name": "title",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "icon",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "showHeader",
+            "type": "bool",
+            "default": "title.length > 0 || icon.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "open",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "exclusive",
+            "type": "bool",
+            "default": "false",
+            "doc": "Reserve screen space, so maximised windows do not sit underneath."
+          },
+          {
+            "kind": "property",
+            "name": "closeOnEscape",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "closeOnClickOutside",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "takesFocus",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "animated",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "signal",
+            "name": "opened"
+          },
+          {
+            "kind": "signal",
+            "name": "closed"
+          },
+          {
+            "kind": "function",
+            "name": "show",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "hide",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "toggle",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginFloatingWindow",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A movable, resizable floating window for a plugin, with geometry that survives a restart.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "Identity. `pluginId` is what plugins.json is keyed on, `windowId` distinguishes several windows belonging to one plugin."
+          },
+          {
+            "kind": "property",
+            "name": "windowId",
+            "type": "string",
+            "default": "\"window\""
+          },
+          {
+            "kind": "property",
+            "name": "title",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "Chrome."
+          },
+          {
+            "kind": "property",
+            "name": "icon",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "showTitleBar",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "showCloseButton",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "actions",
+            "type": "Component",
+            "default": "null",
+            "doc": "Extra buttons in the title bar, right of the title. Give it a Component of a Row or a single item; PluginIconButton is the intended content."
+          },
+          {
+            "kind": "property",
+            "name": "open",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "closeOnEscape",
+            "type": "bool",
+            "default": "true",
+            "doc": "Behaviour."
+          },
+          {
+            "kind": "property",
+            "name": "closeOnClickOutside",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "resizable",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "draggable",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "rememberGeometry",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "minimumWidth",
+            "type": "real",
+            "default": "180",
+            "doc": "Size limits, honoured by dragging and by the stored geometry."
+          },
+          {
+            "kind": "property",
+            "name": "minimumHeight",
+            "type": "real",
+            "default": "120"
+          },
+          {
+            "kind": "property",
+            "name": "maximumWidth",
+            "type": "real",
+            "default": "3000"
+          },
+          {
+            "kind": "property",
+            "name": "maximumHeight",
+            "type": "real",
+            "default": "2000"
+          },
+          {
+            "kind": "property",
+            "name": "initialPosition",
+            "type": "string",
+            "default": "\"center\"",
+            "doc": "Where it goes the first time, before the user has moved it. \"center\", \"top-left\", \"top-right\", \"bottom-left\", \"bottom-right\", or \"cursor\"."
+          },
+          {
+            "kind": "property",
+            "name": "windowX",
+            "type": "real",
+            "default": "0",
+            "doc": "Live geometry. Assigning these moves and resizes the window."
+          },
+          {
+            "kind": "property",
+            "name": "windowY",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "windowWidth",
+            "type": "real",
+            "default": "320"
+          },
+          {
+            "kind": "property",
+            "name": "windowHeight",
+            "type": "real",
+            "default": "240"
+          },
+          {
+            "kind": "signal",
+            "name": "opened"
+          },
+          {
+            "kind": "signal",
+            "name": "closed"
+          },
+          {
+            "kind": "function",
+            "name": "show",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "hide",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "toggle",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "resetGeometry",
+            "returns": "void",
+            "doc": "Puts the window back where `initialPosition` says, forgetting the stored position."
+          }
+        ]
+      },
+      {
+        "name": "PluginForm",
+        "kind": "type",
+        "extends": "ColumnLayout",
+        "summary": "A form over values a plugin owns, using the same controls as the settings GUI.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "fields",
+            "type": "var",
+            "default": "[]",
+            "doc": "[{ key, label, type, description, icon, min, max, step, options, placeholder }]"
+          },
+          {
+            "kind": "property",
+            "name": "values",
+            "type": "var",
+            "default": "({})",
+            "doc": "Current values, keyed by field key. Read-only as far as the form is concerned."
+          },
+          {
+            "kind": "property",
+            "name": "store",
+            "type": "var",
+            "default": "null",
+            "doc": "Optional: a PluginStore (or anything with set(key, value)) to write into automatically."
+          },
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "root.store?.pluginId ?? \"\"",
+            "doc": "Which plugin the rows belong to, for the settings-row fallback path. Inferred from the store when there is one."
+          },
+          {
+            "kind": "signal",
+            "name": "fieldChanged",
+            "args": "string key, var value"
+          },
+          {
+            "kind": "function",
+            "name": "valueOf",
+            "args": "key: string",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "commit",
+            "args": "key: string, value: var",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginFsWatch",
+        "kind": "type",
+        "extends": "QtObject",
+        "summary": "A live view of a file, reloaded whenever it changes on disk.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "path",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "enabled",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "text",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "Latest contents. Empty until the first load, or when the file is unreadable."
+          },
+          {
+            "kind": "property",
+            "name": "ok",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "error",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "json",
+            "type": "var",
+            "readonly": true,
+            "doc": "Parsed contents, or undefined when the file is not JSON. Computed lazily on read."
+          },
+          {
+            "kind": "signal",
+            "name": "changed",
+            "args": "string text"
+          },
+          {
+            "kind": "signal",
+            "name": "failed",
+            "args": "string error"
+          },
+          {
+            "kind": "function",
+            "name": "reload",
+            "returns": "void",
+            "doc": "Force a re-read, for a file whose mtime does not change when its contents do - /proc and /sys are both like that."
+          }
+        ]
+      },
+      {
+        "name": "PluginGauge",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A radial meter, with colour thresholds.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "value",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "maximum",
+            "type": "real",
+            "default": "100"
+          },
+          {
+            "kind": "property",
+            "name": "minimum",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "label",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "Centre text. `label` is small and above, `caption` small and below; the big number in the middle is generated from the value unless `text` is set."
+          },
+          {
+            "kind": "property",
+            "name": "caption",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "text",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "thresholds",
+            "type": "var",
+            "default": "[]",
+            "doc": "[{ at: <value>, color: <color> }] - highest reached wins."
+          },
+          {
+            "kind": "property",
+            "name": "color",
+            "type": "color",
+            "default": "Theme.accent"
+          },
+          {
+            "kind": "property",
+            "name": "trackColor",
+            "type": "color",
+            "default": "Theme.outlineFaint"
+          },
+          {
+            "kind": "property",
+            "name": "thickness",
+            "type": "real",
+            "default": "6"
+          },
+          {
+            "kind": "property",
+            "name": "startAngle",
+            "type": "real",
+            "default": "135",
+            "doc": "Degrees. The default leaves a gap at the bottom, which reads as a dial rather than a pie."
+          },
+          {
+            "kind": "property",
+            "name": "sweepAngle",
+            "type": "real",
+            "default": "270"
+          },
+          {
+            "kind": "property",
+            "name": "animated",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "showValue",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "fraction",
+            "type": "real",
+            "readonly": true
+          },
+          {
+            "kind": "property",
+            "name": "activeColor",
+            "type": "color",
+            "readonly": true
+          }
+        ]
+      },
+      {
         "name": "PluginHost",
         "kind": "type",
         "extends": "Scope",
         "summary": "Instantiates everything plugins contribute at shell scope: their long-lived services and their windows.",
         "members": []
+      },
+      {
+        "name": "PluginHud",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A transient overlay: shown for a moment, then gone.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "anchor",
+            "type": "string",
+            "default": "\"bottom-center\"",
+            "doc": "\"top-center\", \"bottom-center\", \"center\", \"top-left\", \"top-right\", \"bottom-left\", \"bottom-right\", \"left\", \"right\"."
+          },
+          {
+            "kind": "property",
+            "name": "duration",
+            "type": "int",
+            "default": "2500",
+            "doc": "Milliseconds on screen. 0 means \"stay until hide() is called\"."
+          },
+          {
+            "kind": "property",
+            "name": "margin",
+            "type": "real",
+            "default": "80",
+            "doc": "Distance from the screen edge it is anchored to."
+          },
+          {
+            "kind": "property",
+            "name": "animated",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "pauseOnHover",
+            "type": "bool",
+            "default": "true",
+            "doc": "Pause the countdown while the pointer is over it."
+          },
+          {
+            "kind": "property",
+            "name": "visibleNow",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "signal",
+            "name": "shown"
+          },
+          {
+            "kind": "signal",
+            "name": "hidden"
+          },
+          {
+            "kind": "function",
+            "name": "flash",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "show",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "hide",
+            "returns": "void"
+          }
+        ]
       },
       {
         "name": "PluginIconButton",
@@ -1583,6 +2424,19 @@
           },
           {
             "kind": "property",
+            "name": "badge",
+            "type": "int",
+            "default": "0",
+            "doc": "A count or a dot in the corner. 0 hides it, which is what a live count usually is."
+          },
+          {
+            "kind": "property",
+            "name": "badgeDot",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
             "name": "colIcon",
             "type": "color",
             "default": "root.checked ? Theme.onAccentBlock : Theme.text"
@@ -1629,6 +2483,111 @@
             "type": "string",
             "default": "\"\"",
             "doc": "Set by the host from the manifest, so a plugin does not have to repeat its own id."
+          }
+        ]
+      },
+      {
+        "name": "PluginListView",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A scrolling list with search, empty state and a keyboard-navigable selection.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "items",
+            "type": "var",
+            "default": "[]"
+          },
+          {
+            "kind": "property",
+            "name": "searchFields",
+            "type": "var",
+            "default": "[]",
+            "doc": "Which fields the filter looks at. Empty means every string-valued field."
+          },
+          {
+            "kind": "property",
+            "name": "searchable",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "searchPlaceholder",
+            "type": "string",
+            "default": "qsTr(\"Filter\")"
+          },
+          {
+            "kind": "property",
+            "name": "query",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "emptyText",
+            "type": "string",
+            "default": "qsTr(\"Nothing here\")"
+          },
+          {
+            "kind": "property",
+            "name": "emptyIcon",
+            "type": "string",
+            "default": "\"inbox\""
+          },
+          {
+            "kind": "property",
+            "name": "noMatchText",
+            "type": "string",
+            "default": "qsTr(\"No matches\")"
+          },
+          {
+            "kind": "property",
+            "name": "delegate",
+            "type": "Component",
+            "default": "null"
+          },
+          {
+            "kind": "property",
+            "name": "spacing",
+            "type": "real",
+            "default": "Theme.pad.xs"
+          },
+          {
+            "kind": "property",
+            "name": "currentIndex",
+            "type": "int",
+            "default": "-1",
+            "doc": "Highlighted row, for keyboard use. -1 for none."
+          },
+          {
+            "kind": "signal",
+            "name": "activated",
+            "args": "var item, int index"
+          },
+          {
+            "kind": "property",
+            "name": "filtered",
+            "type": "var",
+            "readonly": true
+          },
+          {
+            "kind": "property",
+            "name": "count",
+            "type": "int",
+            "readonly": true,
+            "default": "root.filtered.length"
+          },
+          {
+            "kind": "function",
+            "name": "activateCurrent",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "moveSelection",
+            "args": "delta: int",
+            "returns": "void"
           }
         ]
       },
@@ -1680,7 +2639,7 @@
             "name": "path",
             "type": "string",
             "readonly": true,
-            "default": "(computed)"
+            "default": "`${PluginRegistry.dirOf(root.pluginId)}/manifest.json`"
           },
           {
             "kind": "function",
@@ -1912,10 +2871,23 @@
           },
           {
             "kind": "property",
+            "name": "read",
+            "type": "var",
+            "default": "null",
+            "doc": "Optional overrides. `read` is a function of no arguments returning the current value; `write` takes the new value. Both null means \"this is a plugin setting\"."
+          },
+          {
+            "kind": "property",
+            "name": "write",
+            "type": "var",
+            "default": "null"
+          },
+          {
+            "kind": "property",
             "name": "value",
             "type": "var",
             "readonly": true,
-            "default": "PluginConfig.value(root.pluginId, root.spec.key)"
+            "default": "(computed)"
           },
           {
             "kind": "property",
@@ -1999,6 +2971,344 @@
             "kind": "function",
             "name": "trigger",
             "returns": "var"
+          }
+        ]
+      },
+      {
+        "name": "PluginSparkline",
+        "kind": "type",
+        "extends": "Canvas",
+        "summary": "A telemetry chart: a line, an area, or bars, from a plain array of numbers.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "values",
+            "type": "var",
+            "default": "[]"
+          },
+          {
+            "kind": "property",
+            "name": "maximum",
+            "type": "real",
+            "default": "100",
+            "doc": "Ceiling for the y axis. Ignored when autoScale is on."
+          },
+          {
+            "kind": "property",
+            "name": "minimum",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "autoScale",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "autoScaleFloor",
+            "type": "real",
+            "default": "1",
+            "doc": "Never scale below this, so an all-zero series is a flat line at the bottom rather than noise amplified to full height."
+          },
+          {
+            "kind": "property",
+            "name": "style",
+            "type": "int",
+            "default": "PluginSparkline.Style.Area"
+          },
+          {
+            "kind": "property",
+            "name": "color",
+            "type": "color",
+            "default": "Theme.accent"
+          },
+          {
+            "kind": "property",
+            "name": "fillColor",
+            "type": "color",
+            "default": "Qt.rgba(root.color.r, root.color.g, root.color.b, 0.22)"
+          },
+          {
+            "kind": "property",
+            "name": "lineWidth",
+            "type": "real",
+            "default": "2"
+          },
+          {
+            "kind": "property",
+            "name": "showBaseline",
+            "type": "bool",
+            "default": "true",
+            "doc": "Draw a baseline at the bottom, so an empty chart still reads as a chart."
+          },
+          {
+            "kind": "property",
+            "name": "baselineColor",
+            "type": "color",
+            "default": "Theme.outlineFaint"
+          },
+          {
+            "kind": "property",
+            "name": "smooth_",
+            "type": "bool",
+            "default": "true",
+            "doc": "Rounded caps and joins look better at small sizes; square is more honest for bars."
+          }
+        ]
+      },
+      {
+        "name": "PluginSpectrum",
+        "kind": "type",
+        "extends": "QtObject",
+        "summary": "A subscription to the audio spectrum, which is what makes cava run.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "bars",
+            "type": "int",
+            "default": "0",
+            "doc": "Set to resample; 0 means \"give me exactly what cava produces\"."
+          },
+          {
+            "kind": "property",
+            "name": "active",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "points",
+            "type": "var",
+            "readonly": true
+          },
+          {
+            "kind": "property",
+            "name": "peak",
+            "type": "real",
+            "readonly": true,
+            "default": "root.points.length === 0 ? 0 : Math.max(...root.points)",
+            "doc": "The loudest band, for a single-value meter."
+          },
+          {
+            "kind": "property",
+            "name": "average",
+            "type": "real",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "running",
+            "type": "bool",
+            "readonly": true,
+            "default": "PluginAudio.spectrumRunning"
+          }
+        ]
+      },
+      {
+        "name": "PluginStore",
+        "kind": "type",
+        "extends": "QtObject",
+        "summary": "Declarative access to a plugin's persistent storage.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "store",
+            "type": "var",
+            "readonly": true,
+            "default": "PluginStorage.of(root.pluginId)",
+            "doc": "The underlying store; `values` on it is what to bind to for a whole-object read."
+          },
+          {
+            "kind": "property",
+            "name": "values",
+            "type": "var",
+            "readonly": true,
+            "default": "root.store.values",
+            "doc": "One property per read so bindings stay precise."
+          },
+          {
+            "kind": "property",
+            "name": "loaded",
+            "type": "bool",
+            "readonly": true,
+            "default": "PluginStorage.loaded",
+            "doc": "False until plugins.json has been read: a plugin that writes before this is true writes on top of empty storage."
+          },
+          {
+            "kind": "function",
+            "name": "get",
+            "args": "key: string, fallback: var",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "has",
+            "args": "key: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "set",
+            "args": "key: string, value: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "merge",
+            "args": "patch: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "update",
+            "args": "key: string, transform: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "remove",
+            "args": "key: string",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "keys",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "clear",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "list",
+            "args": "name: string",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "count",
+            "args": "name: string",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "append",
+            "args": "name: string, entry: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "prepend",
+            "args": "name: string, entry: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "push",
+            "args": "name: string, entry: var, limit: int",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "find",
+            "args": "name: string, id: var",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "upsert",
+            "args": "name: string, entry: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "removeFrom",
+            "args": "name: string, id: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "removeWhere",
+            "args": "name: string, predicate: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "clearList",
+            "args": "name: string",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginTabs",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A tab strip with a sliding indicator, plus the pages behind it.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "tabs",
+            "type": "var",
+            "default": "[]",
+            "doc": "[{ label, icon, badge, enabled }]"
+          },
+          {
+            "kind": "property",
+            "name": "currentIndex",
+            "type": "int",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "pagesVisible",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "stripPosition",
+            "type": "string",
+            "default": "\"top\"",
+            "doc": "\"top\" or \"bottom\" - where the strip sits relative to the pages."
+          },
+          {
+            "kind": "property",
+            "name": "stripHeight",
+            "type": "real",
+            "default": "40"
+          },
+          {
+            "kind": "signal",
+            "name": "tabSelected",
+            "args": "int index"
+          },
+          {
+            "kind": "function",
+            "name": "select",
+            "args": "index: int",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "next",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "previous",
+            "returns": "void"
           }
         ]
       },
@@ -2267,8 +3577,7 @@
             "name": "builtins",
             "type": "var",
             "readonly": true,
-            "default": "[",
-            "doc": "`builtin` names a case the menu handles itself: these open submenus and manage hover state, which is not something a manifest can express."
+            "default": "["
           },
           {
             "kind": "property",
@@ -2279,10 +3588,24 @@
           },
           {
             "kind": "function",
-            "name": "activate",
+            "name": "opensSubmenu",
             "args": "item: var",
             "returns": "bool",
-            "doc": "Run a plugin item. Returns true if the menu should close - which it should for an action, and should not for a row that opened a submenu."
+            "doc": "Does this row open a submenu rather than doing something?"
+          },
+          {
+            "kind": "function",
+            "name": "badgeValue",
+            "args": "item: var",
+            "returns": "var",
+            "doc": "The retained bus value for a row's badge, or undefined when it has none."
+          },
+          {
+            "kind": "function",
+            "name": "activate",
+            "args": "item: var, context: var",
+            "returns": "bool",
+            "doc": "Run a row. `context` is the menu's own open arguments - { screen, x, y } - and is what \"$menuX\" and friends resolve against. Returns true if the menu should close, which it should "
           }
         ]
       },
@@ -2418,6 +3741,147 @@
         ]
       },
       {
+        "name": "PanelRegistry",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Every panel the shell can open, and whether it is open.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "builtins",
+            "type": "var",
+            "readonly": true,
+            "default": "[",
+            "doc": "`group: \"overlay\"` means full-screen and mutually exclusive."
+          },
+          {
+            "kind": "property",
+            "name": "contributed",
+            "type": "var",
+            "readonly": true,
+            "default": "PluginRegistry.installedPanels",
+            "doc": "Panels contributed by plugins, from `provides.panels` entries that declare an `id`."
+          },
+          {
+            "kind": "property",
+            "name": "all",
+            "type": "var",
+            "readonly": true
+          },
+          {
+            "kind": "property",
+            "name": "ids",
+            "type": "var",
+            "readonly": true,
+            "default": "root.all.map(entry => entry.id)"
+          },
+          {
+            "kind": "property",
+            "name": "states",
+            "type": "var",
+            "default": "({})",
+            "doc": "------------------------------------------------------------------ state id -> QtObject { open, args, at }. Created on demand and never destroyed: a panel's state object outlives t"
+          },
+          {
+            "kind": "property",
+            "name": "revision",
+            "type": "int",
+            "default": "0",
+            "doc": "Bumped whenever any panel opens or closes, for `openIds` and for the settings GUI."
+          },
+          {
+            "kind": "function",
+            "name": "state",
+            "args": "id: string",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "isOpen",
+            "args": "id: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "property",
+            "name": "openIds",
+            "type": "var",
+            "readonly": true
+          },
+          {
+            "kind": "property",
+            "name": "anyOverlayOpen",
+            "type": "bool",
+            "readonly": true
+          },
+          {
+            "kind": "function",
+            "name": "groupOf",
+            "args": "id: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "describe",
+            "args": "id: string",
+            "returns": "var"
+          },
+          {
+            "kind": "signal",
+            "name": "opened",
+            "args": "string id, var args",
+            "doc": "----------------------------------------------------------------- acting"
+          },
+          {
+            "kind": "signal",
+            "name": "closed",
+            "args": "string id"
+          },
+          {
+            "kind": "function",
+            "name": "open",
+            "args": "id: string, args: var",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "close",
+            "args": "id: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "toggle",
+            "args": "id: string, args: var",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "set",
+            "args": "id: string, open: bool, args: var",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "closeAll",
+            "returns": "int",
+            "doc": "Everything except the panels marked persistent - what Escape and a lock screen want."
+          },
+          {
+            "kind": "function",
+            "name": "closeGroup",
+            "args": "group: string",
+            "returns": "int"
+          },
+          {
+            "kind": "property",
+            "name": "stateComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          }
+        ]
+      },
+      {
         "name": "Perf",
         "kind": "singleton",
         "extends": "Singleton",
@@ -2482,6 +3946,502 @@
             "kind": "function",
             "name": "report",
             "returns": "string"
+          }
+        ]
+      },
+      {
+        "name": "PluginApps",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Installed applications: find them, launch them, pin them.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "all",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "count",
+            "type": "int",
+            "readonly": true,
+            "default": "root.all.length"
+          },
+          {
+            "kind": "property",
+            "name": "pinned",
+            "type": "var",
+            "readonly": true,
+            "default": "(Config.options.launcher.pinnedApps ?? [])",
+            "doc": "In the order the user arranged them, skipping any that are no longer installed."
+          },
+          {
+            "kind": "function",
+            "name": "byId",
+            "args": "id: string",
+            "returns": "var",
+            "doc": "----------------------------------------------------------------- finding"
+          },
+          {
+            "kind": "function",
+            "name": "find",
+            "args": "needle: string",
+            "returns": "var",
+            "doc": "id, then exact name, then window class, then case-insensitive name. In that order because \"firefox\" is an id on one distribution and a name on another."
+          },
+          {
+            "kind": "function",
+            "name": "search",
+            "args": "query: string, limit: int",
+            "returns": "var",
+            "doc": "Ranked fuzzy search, best first. Empty query returns everything, alphabetically, which is what a launcher shows before anything is typed."
+          },
+          {
+            "kind": "function",
+            "name": "inCategory",
+            "args": "category: string",
+            "returns": "var",
+            "doc": "Applications in a freedesktop category (\"Development\", \"Graphics\", \"Game\")."
+          },
+          {
+            "kind": "property",
+            "name": "categories",
+            "type": "var",
+            "readonly": true
+          },
+          {
+            "kind": "function",
+            "name": "launch",
+            "args": "needle: string",
+            "returns": "bool",
+            "doc": "--------------------------------------------------------------- launching Returns false when nothing matched, so a caller can fall back instead of silently doing nothing."
+          },
+          {
+            "kind": "function",
+            "name": "launchWith",
+            "args": "needle: string, target: string",
+            "returns": "bool",
+            "doc": "Opens `target` (a file path or URL) with the given application."
+          },
+          {
+            "kind": "function",
+            "name": "open",
+            "args": "target: string",
+            "returns": "void",
+            "doc": "Opens a file or URL with whatever the system considers its default handler."
+          },
+          {
+            "kind": "function",
+            "name": "isPinned",
+            "args": "id: string",
+            "returns": "bool",
+            "doc": "------------------------------------------------------------------ pinning"
+          },
+          {
+            "kind": "function",
+            "name": "togglePin",
+            "args": "id: string",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "icon",
+            "args": "name: string",
+            "returns": "string"
+          }
+        ]
+      },
+      {
+        "name": "PluginAudio",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Volume, per-app streams, and the audio spectrum.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "ready",
+            "type": "bool",
+            "readonly": true,
+            "default": "Audio.ready",
+            "doc": "---------------------------------------------------------------- master"
+          },
+          {
+            "kind": "property",
+            "name": "sink",
+            "type": "PwNode",
+            "readonly": true,
+            "default": "Audio.sink"
+          },
+          {
+            "kind": "property",
+            "name": "source",
+            "type": "PwNode",
+            "readonly": true,
+            "default": "Audio.source"
+          },
+          {
+            "kind": "property",
+            "name": "volume",
+            "type": "real",
+            "readonly": true,
+            "default": "Audio.sink?.audio.volume ?? 0"
+          },
+          {
+            "kind": "property",
+            "name": "muted",
+            "type": "bool",
+            "readonly": true,
+            "default": "Audio.sink?.audio.muted ?? false"
+          },
+          {
+            "kind": "property",
+            "name": "maxVolume",
+            "type": "real",
+            "readonly": true,
+            "default": "Audio.hardMaxValue"
+          },
+          {
+            "kind": "property",
+            "name": "inputVolume",
+            "type": "real",
+            "readonly": true,
+            "default": "Audio.source?.audio.volume ?? 0"
+          },
+          {
+            "kind": "property",
+            "name": "inputMuted",
+            "type": "bool",
+            "readonly": true,
+            "default": "Audio.source?.audio.muted ?? false"
+          },
+          {
+            "kind": "property",
+            "name": "sinkName",
+            "type": "string",
+            "readonly": true,
+            "default": "Audio.sink ? Audio.friendlyDeviceName(Audio.sink) : \"\""
+          },
+          {
+            "kind": "property",
+            "name": "sourceName",
+            "type": "string",
+            "readonly": true,
+            "default": "Audio.source ? Audio.friendlyDeviceName(Audio.source) : \"\""
+          },
+          {
+            "kind": "function",
+            "name": "setVolume",
+            "args": "value: real",
+            "returns": "void",
+            "doc": "Clamped to the shell's own maximum, so a plugin cannot set 500% by accident."
+          },
+          {
+            "kind": "function",
+            "name": "changeVolume",
+            "args": "delta: real",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setMuted",
+            "args": "muted: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "toggleMute",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setInputVolume",
+            "args": "value: real",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "toggleInputMute",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "playSound",
+            "args": "name: string",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "apps",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "------------------------------------------------------------- per-app One entry per playing application. Plain objects: a mixer row binds to `entry.volume` and calls `entry.setVolu"
+          },
+          {
+            "kind": "property",
+            "name": "recorders",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "outputs",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "-------------------------------------------------------------- devices"
+          },
+          {
+            "kind": "property",
+            "name": "inputs",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "spectrum",
+            "type": "var",
+            "default": "[]",
+            "doc": "------------------------------------------------------------- spectrum Latest magnitudes, 0..1, low frequencies first. Empty while nothing is subscribed."
+          },
+          {
+            "kind": "property",
+            "name": "bands",
+            "type": "int",
+            "readonly": true,
+            "default": "50"
+          },
+          {
+            "kind": "property",
+            "name": "spectrumSubscribers",
+            "type": "int",
+            "default": "0",
+            "doc": "How many PluginSpectrum instances are alive. cava is a real process doing real DSP; it runs when at least one is, and not otherwise."
+          },
+          {
+            "kind": "property",
+            "name": "spectrumRunning",
+            "type": "bool",
+            "readonly": true,
+            "default": "cavaProcess.running"
+          },
+          {
+            "kind": "function",
+            "name": "acquireSpectrum",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "releaseSpectrum",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginBluetooth",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Bluetooth adapters and devices.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "available",
+            "type": "bool",
+            "readonly": true,
+            "default": "BluetoothStatus.available"
+          },
+          {
+            "kind": "property",
+            "name": "enabled",
+            "type": "bool",
+            "readonly": true,
+            "default": "BluetoothStatus.enabled"
+          },
+          {
+            "kind": "property",
+            "name": "connected",
+            "type": "bool",
+            "readonly": true,
+            "default": "BluetoothStatus.connected"
+          },
+          {
+            "kind": "property",
+            "name": "connectedCount",
+            "type": "int",
+            "readonly": true,
+            "default": "BluetoothStatus.activeDeviceCount"
+          },
+          {
+            "kind": "property",
+            "name": "scanning",
+            "type": "bool",
+            "readonly": true,
+            "default": "Bluetooth.defaultAdapter?.discovering ?? false"
+          },
+          {
+            "kind": "property",
+            "name": "adapterName",
+            "type": "string",
+            "readonly": true,
+            "default": "Bluetooth.defaultAdapter?.name ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "devices",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "connectedDevices",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "pairedDevices",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "primaryDevice",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "The one a media widget should show: the first connected audio device, or just the first connected device."
+          },
+          {
+            "kind": "function",
+            "name": "toggle",
+            "returns": "void",
+            "doc": "---------------------------------------------------------------- control"
+          },
+          {
+            "kind": "function",
+            "name": "setEnabled",
+            "args": "enabled: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "scan",
+            "args": "enabled: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "connectTo",
+            "args": "address: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "disconnectFrom",
+            "args": "address: string",
+            "returns": "bool"
+          }
+        ]
+      },
+      {
+        "name": "PluginBus",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "The event bus: how two plugins that have never heard of each other talk.",
+        "members": [
+          {
+            "kind": "function",
+            "name": "emit",
+            "args": "topic: string, payload: var",
+            "returns": "int",
+            "doc": "------------------------------------------------------------------ send Fire and forget. Returns the number of handlers that ran, which is what a caller wants when the question is "
+          },
+          {
+            "kind": "function",
+            "name": "publish",
+            "args": "topic: string, value: var",
+            "returns": "int",
+            "doc": "Fire, and keep the value for later readers."
+          },
+          {
+            "kind": "function",
+            "name": "on",
+            "args": "topic: string, callback: var",
+            "returns": "int",
+            "doc": "--------------------------------------------------------------- receive Returns a token; pass it to off(). A topic ending in \":*\" or \"*\" matches by prefix, so \"wallpaper:*\" hears \""
+          },
+          {
+            "kind": "function",
+            "name": "once",
+            "args": "topic: string, callback: var",
+            "returns": "int",
+            "doc": "Fires at most once, then unsubscribes itself."
+          },
+          {
+            "kind": "function",
+            "name": "off",
+            "args": "token: int",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "retained",
+            "args": "topic: string",
+            "returns": "var",
+            "doc": "---------------------------------------------------------------- retained The live cell for a topic, created empty if nothing has published yet. Bind to `.value`, not to the cell: "
+          },
+          {
+            "kind": "function",
+            "name": "value",
+            "args": "topic: string, fallback: var",
+            "returns": "var",
+            "doc": "The current value, or `fallback` when the topic has never been published."
+          },
+          {
+            "kind": "function",
+            "name": "has",
+            "args": "topic: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "clear",
+            "args": "topic: string",
+            "returns": "void",
+            "doc": "Drops a retained value without destroying the cell, so existing bindings keep working and simply read undefined."
+          },
+          {
+            "kind": "function",
+            "name": "cell",
+            "args": "topic: string",
+            "returns": "var"
+          },
+          {
+            "kind": "property",
+            "name": "topics",
+            "type": "var",
+            "readonly": true,
+            "doc": "----------------------------------------------------------- introspection Every topic anyone is listening to or has published on - `plugins bus` prints this, which is the differenc"
+          },
+          {
+            "kind": "function",
+            "name": "describe",
+            "args": "topic: string",
+            "returns": "var"
+          },
+          {
+            "kind": "property",
+            "name": "cellComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
           }
         ]
       },
@@ -2691,6 +4651,1192 @@
         ]
       },
       {
+        "name": "PluginDialogs",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Modal dialogs, drawn by the shell rather than by another program.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "current",
+            "type": "var",
+            "default": "null",
+            "doc": "The dialog currently on screen, as { kind, options, callback }, or null."
+          },
+          {
+            "kind": "property",
+            "name": "queue",
+            "type": "var",
+            "default": "[]",
+            "doc": "Waiting dialogs. A plugin that asks twice in one frame gets two dialogs, in order, rather than one silently dropped."
+          },
+          {
+            "kind": "property",
+            "name": "open",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.current !== null"
+          },
+          {
+            "kind": "function",
+            "name": "confirm",
+            "args": "options: var, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "prompt",
+            "args": "options: var, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "choose",
+            "args": "options: var, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "alert",
+            "args": "options: var, callback: var",
+            "returns": "void",
+            "doc": "Informational, one button. Returns nothing useful; the callback fires on dismissal."
+          },
+          {
+            "kind": "function",
+            "name": "resolve",
+            "args": "result: var",
+            "returns": "void",
+            "doc": "Called by the dialog surface. `result` is a bool, a string or an index depending on kind."
+          },
+          {
+            "kind": "function",
+            "name": "cancel",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "openFile",
+            "args": "options: var, callback: var",
+            "returns": "void",
+            "doc": "filter is a space-separated list of MIME types, which is what kdialog wants:   \"image/png image/jpeg\""
+          },
+          {
+            "kind": "function",
+            "name": "saveFile",
+            "args": "options: var, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "openFolder",
+            "args": "options: var, callback: var",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginDisplay",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Screen brightness, gamma and night light.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "focusedMonitor",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "------------------------------------------------------------ brightness"
+          },
+          {
+            "kind": "property",
+            "name": "brightness",
+            "type": "real",
+            "readonly": true,
+            "default": "root.focusedMonitor?.brightness ?? 0"
+          },
+          {
+            "kind": "property",
+            "name": "available",
+            "type": "bool",
+            "readonly": true,
+            "default": "!!root.focusedMonitor"
+          },
+          {
+            "kind": "property",
+            "name": "monitors",
+            "type": "var",
+            "readonly": true,
+            "default": "Brightness.monitors.map(monitor => (",
+            "doc": "[{ name, brightness, isDdc, ready, setBrightness(v), monitor }]"
+          },
+          {
+            "kind": "function",
+            "name": "setBrightness",
+            "args": "value: real",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "step",
+            "args": "delta: real",
+            "returns": "void",
+            "doc": "Signed delta, clamped. `step(0.05)` is what a brightness-up key should do."
+          },
+          {
+            "kind": "function",
+            "name": "increase",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "decrease",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setBrightnessOn",
+            "args": "monitorName: string, value: real",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "nightLight",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "------------------------------------------------------------ night light"
+          },
+          {
+            "kind": "property",
+            "name": "gamma",
+            "type": "int",
+            "readonly": true,
+            "default": "Hyprsunset.gamma",
+            "doc": "------------------------------------------------------------------ gamma"
+          },
+          {
+            "kind": "function",
+            "name": "setGamma",
+            "args": "percent: int",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginFs",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Files, without the ceremony.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "home",
+            "type": "string",
+            "readonly": true,
+            "default": "Quickshell.env(\"HOME\") ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "configDir",
+            "type": "string",
+            "readonly": true,
+            "default": "Quickshell.env(\"XDG_CONFIG_HOME\") || `${root.home}/.config`"
+          },
+          {
+            "kind": "property",
+            "name": "cacheDir",
+            "type": "string",
+            "readonly": true,
+            "default": "Quickshell.env(\"XDG_CACHE_HOME\") || `${root.home}/.cache`"
+          },
+          {
+            "kind": "property",
+            "name": "dataDir",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "stateDir",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "runtimeDir",
+            "type": "string",
+            "readonly": true,
+            "default": "Quickshell.env(\"XDG_RUNTIME_DIR\") || \"/tmp\""
+          },
+          {
+            "kind": "function",
+            "name": "expand",
+            "args": "path: string",
+            "returns": "string",
+            "doc": "\"~/x\" and \"$HOME/x\" and \"file:///x\" all become \"/home/you/x\". A path that is already absolute comes back untouched."
+          },
+          {
+            "kind": "function",
+            "name": "url",
+            "args": "path: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "dirname",
+            "args": "path: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "basename",
+            "args": "path: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "extension",
+            "args": "path: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "join",
+            "args": "...parts",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "read",
+            "args": "path: string, callback: var",
+            "returns": "void",
+            "doc": "------------------------------------------------------------------- read callback({ ok, path, text, error })"
+          },
+          {
+            "kind": "function",
+            "name": "readJson",
+            "args": "path: string, callback: var",
+            "returns": "void",
+            "doc": "callback({ ok, path, data, text, error }) - `ok` is false for unparseable JSON too, with the parse message in `error`, which is the distinction callers actually need."
+          },
+          {
+            "kind": "function",
+            "name": "readLines",
+            "args": "path: string, callback: var",
+            "returns": "void",
+            "doc": "Lines, with the trailing newline's empty string dropped - the shape /proc and /sys files come in."
+          },
+          {
+            "kind": "function",
+            "name": "write",
+            "args": "path: string, text: string, callback: var",
+            "returns": "void",
+            "doc": "------------------------------------------------------------------ write Creates parent directories, writes atomically. callback({ ok, path, error })"
+          },
+          {
+            "kind": "function",
+            "name": "writeJson",
+            "args": "path: string, value: var, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "append",
+            "args": "path: string, text: string, callback: var",
+            "returns": "void",
+            "doc": "Read-modify-write. Not an O_APPEND write: FileView has no append mode, and doing it this way keeps the atomic rename, so a log file cannot end up truncated."
+          },
+          {
+            "kind": "function",
+            "name": "updateJson",
+            "args": "path: string, transform: var, callback: var",
+            "returns": "void",
+            "doc": "(Object.assign, not `{ ...current }`: Qt's JS engine has no object spread.)"
+          },
+          {
+            "kind": "function",
+            "name": "mkdir",
+            "args": "path: string, callback: var",
+            "returns": "void",
+            "doc": "argv, never a shell string: a path with a space or a quote in it is ordinary and must not need escaping."
+          },
+          {
+            "kind": "function",
+            "name": "remove",
+            "args": "path: string, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "copy",
+            "args": "from: string, to: string, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "move",
+            "args": "from: string, to: string, callback: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "exists",
+            "args": "path: string, callback: var",
+            "returns": "void",
+            "doc": "callback(bool). A read that fails is the test, so this costs one open for a file that exists - fine for the config-sized files this is used on."
+          },
+          {
+            "kind": "function",
+            "name": "list",
+            "args": "path: string, callback: var, options: var",
+            "returns": "void",
+            "doc": "Uses FolderListModel rather than parsing ls output. The existence check in front of it is not redundant: FolderListModel accepts a path that does not exist and reports zero entries"
+          },
+          {
+            "kind": "function",
+            "name": "readSync",
+            "args": "path: string",
+            "returns": "string",
+            "doc": "This blocks the UI thread, and that is the point: /proc and /sys files are generated on read and cost tens of microseconds, and an asynchronous read of them means every consumer is"
+          },
+          {
+            "kind": "function",
+            "name": "readSyncNumber",
+            "args": "path: string, fallback: real",
+            "returns": "real",
+            "doc": "First line, trimmed - the shape of nearly every sysfs value."
+          },
+          {
+            "kind": "property",
+            "name": "syncReader",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          },
+          {
+            "kind": "function",
+            "name": "watch",
+            "args": "path: string, callback: var",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "unwatch",
+            "args": "token: int",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "oneShotReader",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component",
+            "doc": "--------------------------------------------------------------- internals"
+          },
+          {
+            "kind": "property",
+            "name": "oneShotWriter",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          },
+          {
+            "kind": "property",
+            "name": "oneShotLister",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          },
+          {
+            "kind": "property",
+            "name": "watcherComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          }
+        ]
+      },
+      {
+        "name": "PluginMedia",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Whatever is playing, whichever player it is in.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "player",
+            "type": "MprisPlayer",
+            "readonly": true,
+            "default": "MprisController.activePlayer"
+          },
+          {
+            "kind": "property",
+            "name": "available",
+            "type": "bool",
+            "readonly": true,
+            "default": "!!root.player"
+          },
+          {
+            "kind": "property",
+            "name": "isPlaying",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.isPlaying"
+          },
+          {
+            "kind": "property",
+            "name": "title",
+            "type": "string",
+            "readonly": true,
+            "default": "root.player?.trackTitle ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "artist",
+            "type": "string",
+            "readonly": true,
+            "default": "root.player?.trackArtist ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "album",
+            "type": "string",
+            "readonly": true,
+            "default": "root.player?.trackAlbum ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "artUrl",
+            "type": "string",
+            "readonly": true,
+            "default": "root.player?.trackArtUrl ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "playerName",
+            "type": "string",
+            "readonly": true,
+            "default": "root.player?.identity ?? \"\""
+          },
+          {
+            "kind": "property",
+            "name": "lengthSeconds",
+            "type": "real",
+            "readonly": true,
+            "default": "(root.player?.length ?? 0) > 0 ? root.player.length : 0"
+          },
+          {
+            "kind": "property",
+            "name": "positionSeconds",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "progress",
+            "type": "real",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "0..1, clamped: a player that reports a position past its own length (they do) must not push a progress bar out of its track."
+          },
+          {
+            "kind": "property",
+            "name": "positionFormatted",
+            "type": "string",
+            "readonly": true,
+            "default": "PluginUtils.formatDuration(root.positionSeconds)"
+          },
+          {
+            "kind": "property",
+            "name": "lengthFormatted",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "canPlayPause",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.canTogglePlaying"
+          },
+          {
+            "kind": "property",
+            "name": "canGoNext",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.canGoNext"
+          },
+          {
+            "kind": "property",
+            "name": "canGoPrevious",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.canGoPrevious"
+          },
+          {
+            "kind": "property",
+            "name": "canSeek",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.player?.canSeek ?? false"
+          },
+          {
+            "kind": "property",
+            "name": "canChangeVolume",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.canChangeVolume"
+          },
+          {
+            "kind": "property",
+            "name": "volume",
+            "type": "real",
+            "readonly": true,
+            "default": "root.player?.volume ?? 0"
+          },
+          {
+            "kind": "property",
+            "name": "shuffle",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.hasShuffle"
+          },
+          {
+            "kind": "property",
+            "name": "shuffleSupported",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.shuffleSupported"
+          },
+          {
+            "kind": "property",
+            "name": "loopState",
+            "type": "var",
+            "readonly": true,
+            "default": "MprisController.loopState"
+          },
+          {
+            "kind": "property",
+            "name": "loopSupported",
+            "type": "bool",
+            "readonly": true,
+            "default": "MprisController.loopSupported"
+          },
+          {
+            "kind": "property",
+            "name": "players",
+            "type": "var",
+            "readonly": true,
+            "default": "MprisController.players.map(candidate => (",
+            "doc": "Every real player, with a way to make one active."
+          },
+          {
+            "kind": "function",
+            "name": "playPause",
+            "returns": "void",
+            "doc": "----------------------------------------------------------------- control"
+          },
+          {
+            "kind": "function",
+            "name": "next",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "previous",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "play",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "pause",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "pauseAll",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "seek",
+            "args": "seconds: real",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "seekFraction",
+            "args": "fraction: real",
+            "returns": "void",
+            "doc": "0..1 of the track, for a click on a progress bar."
+          },
+          {
+            "kind": "function",
+            "name": "skip",
+            "args": "seconds: real",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setVolume",
+            "args": "value: real",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setShuffle",
+            "args": "enabled: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setLoopState",
+            "args": "state: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "raise",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginNetwork",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Wi-Fi, ethernet, and VPNs.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "online",
+            "type": "bool",
+            "readonly": true,
+            "default": "Network.wifiStatus === \"connected\" || Network.ethernet",
+            "doc": "------------------------------------------------------------------ links"
+          },
+          {
+            "kind": "property",
+            "name": "type",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "wifiEnabled",
+            "type": "bool",
+            "readonly": true,
+            "default": "Network.wifiEnabled"
+          },
+          {
+            "kind": "property",
+            "name": "wifiScanning",
+            "type": "bool",
+            "readonly": true,
+            "default": "Network.wifiScanning"
+          },
+          {
+            "kind": "property",
+            "name": "connecting",
+            "type": "bool",
+            "readonly": true,
+            "default": "Network.wifiConnecting"
+          },
+          {
+            "kind": "property",
+            "name": "ssid",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.networkName"
+          },
+          {
+            "kind": "property",
+            "name": "signalPercent",
+            "type": "int",
+            "readonly": true,
+            "default": "Network.networkStrength"
+          },
+          {
+            "kind": "property",
+            "name": "ipAddress",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.ipAddress"
+          },
+          {
+            "kind": "property",
+            "name": "publicIpAddress",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.publicIpAddress"
+          },
+          {
+            "kind": "property",
+            "name": "gateway",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.gateway"
+          },
+          {
+            "kind": "property",
+            "name": "macAddress",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.macAddress"
+          },
+          {
+            "kind": "property",
+            "name": "interfaceName",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.networkInterface"
+          },
+          {
+            "kind": "property",
+            "name": "icon",
+            "type": "string",
+            "readonly": true,
+            "default": "Network.materialSymbol"
+          },
+          {
+            "kind": "property",
+            "name": "networks",
+            "type": "var",
+            "readonly": true,
+            "default": "Network.friendlyWifiNetworks.map(access => (",
+            "doc": "\"Saved\" is not in the shell's access point model and nmcli would have to be asked separately for it, so it is deliberately absent rather than reported as a guess: a connect() with "
+          },
+          {
+            "kind": "function",
+            "name": "toggleWifi",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "enableWifi",
+            "args": "enabled: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "rescan",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "connect",
+            "args": "ssid: string, password: string",
+            "returns": "bool",
+            "doc": "`password` may be omitted for an open or already-saved network."
+          },
+          {
+            "kind": "function",
+            "name": "disconnect",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "vpns",
+            "type": "var",
+            "default": "[]",
+            "doc": "------------------------------------------------------------------- vpn [{ id, name, type, connected, source, toggle(), up(), down() }]"
+          },
+          {
+            "kind": "property",
+            "name": "vpnConnected",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.vpns.some(entry => entry.connected)"
+          },
+          {
+            "kind": "property",
+            "name": "activeVpns",
+            "type": "var",
+            "readonly": true,
+            "default": "root.vpns.filter(entry => entry.connected)"
+          },
+          {
+            "kind": "function",
+            "name": "refreshVpns",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginNotifications",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Notifications: what arrived, what to do about it, and whether to be quiet.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "history",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "-------------------------------------------------------------- reading"
+          },
+          {
+            "kind": "property",
+            "name": "popups",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "count",
+            "type": "int",
+            "readonly": true,
+            "default": "Notifications.list.length"
+          },
+          {
+            "kind": "property",
+            "name": "unreadCount",
+            "type": "int",
+            "readonly": true,
+            "default": "Notifications.list.filter(entry => entry.popup).length"
+          },
+          {
+            "kind": "property",
+            "name": "hasAny",
+            "type": "bool",
+            "readonly": true,
+            "default": "Notifications.list.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "byApp",
+            "type": "var",
+            "readonly": true,
+            "doc": "Grouped by application, in the order the shell's own list uses."
+          },
+          {
+            "kind": "property",
+            "name": "dnd",
+            "type": "alias",
+            "default": "(computed)",
+            "doc": "------------------------------------------------------------- do not disturb The shell's own name for this is `silent`; \"dnd\" is what everyone calls it."
+          },
+          {
+            "kind": "function",
+            "name": "toggleDnd",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "setDnd",
+            "args": "enabled: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "dismiss",
+            "args": "id: int",
+            "returns": "void",
+            "doc": "--------------------------------------------------------------- acting"
+          },
+          {
+            "kind": "function",
+            "name": "clearAll",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "markAllRead",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "dismissPopups",
+            "returns": "void",
+            "doc": "Hides the popups without discarding the notifications."
+          },
+          {
+            "kind": "function",
+            "name": "invokeAction",
+            "args": "id: int, actionId: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "send",
+            "args": "title: string, body: string, options: var",
+            "returns": "void",
+            "doc": "--------------------------------------------------------------- sending options: { icon, urgency: \"low\"|\"normal\"|\"critical\", appName, replaceTag }"
+          }
+        ]
+      },
+      {
+        "name": "PluginPower",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Power actions, battery, and sleep inhibitors.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "hasBattery",
+            "type": "bool",
+            "readonly": true,
+            "default": "Battery.available",
+            "doc": "------------------------------------------------------------- battery"
+          },
+          {
+            "kind": "property",
+            "name": "percent",
+            "type": "real",
+            "readonly": true,
+            "default": "Battery.percentage * 100"
+          },
+          {
+            "kind": "property",
+            "name": "isCharging",
+            "type": "bool",
+            "readonly": true,
+            "default": "Battery.isCharging"
+          },
+          {
+            "kind": "property",
+            "name": "isLow",
+            "type": "bool",
+            "readonly": true,
+            "default": "Battery.isLow"
+          },
+          {
+            "kind": "property",
+            "name": "isCritical",
+            "type": "bool",
+            "readonly": true,
+            "default": "Battery.isCritical"
+          },
+          {
+            "kind": "property",
+            "name": "isPluggedIn",
+            "type": "bool",
+            "readonly": true,
+            "default": "Battery.isPluggedIn"
+          },
+          {
+            "kind": "property",
+            "name": "powerWatts",
+            "type": "real",
+            "readonly": true,
+            "default": "Battery.energyRate",
+            "doc": "Watts, positive while discharging and negative while charging is how UPower reports it; the sign is kept because a widget showing \"drawing 12W\" wants to know."
+          },
+          {
+            "kind": "property",
+            "name": "healthPercent",
+            "type": "real",
+            "readonly": true,
+            "default": "Battery.health"
+          },
+          {
+            "kind": "property",
+            "name": "chargeCycles",
+            "type": "int",
+            "readonly": true,
+            "default": "Battery.chargeCycles"
+          },
+          {
+            "kind": "property",
+            "name": "timeRemaining",
+            "type": "string",
+            "readonly": true,
+            "doc": "\"2h 14m\" while discharging, \"1h 05m to full\" while charging, \"\" when the estimate is not available yet - which it is not for the first minute or so after plugging in."
+          },
+          {
+            "kind": "function",
+            "name": "lock",
+            "returns": "void",
+            "doc": "------------------------------------------------------------- actions"
+          },
+          {
+            "kind": "function",
+            "name": "suspend",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "hibernate",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "reboot",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "rebootToFirmware",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "powerOff",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "logout",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "inhibited",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "inhibitors",
+            "type": "var",
+            "readonly": true,
+            "doc": "[{ token, reason, what }] - so a status widget can say *why* the machine will not sleep, which is the whole point of having a list."
+          },
+          {
+            "kind": "function",
+            "name": "inhibit",
+            "args": "reason: string, what: string",
+            "returns": "int",
+            "doc": "`what` follows systemd's vocabulary: any of sleep, idle, shutdown, handle-lid-switch, colon separated. The default blocks suspend and idle, which is what \"keep going\" means for a d"
+          },
+          {
+            "kind": "function",
+            "name": "release",
+            "args": "token: int",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "releaseAll",
+            "returns": "int"
+          },
+          {
+            "kind": "property",
+            "name": "inhibitIdle",
+            "type": "alias",
+            "default": "(computed)",
+            "doc": "Screen blanking, through the compositor rather than systemd."
+          },
+          {
+            "kind": "property",
+            "name": "inhibitorComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          }
+        ]
+      },
+      {
+        "name": "PluginPrivacy",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Is anything using the microphone, the camera, or the screen right now.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "micInUse",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "screenSharing",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "micApps",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "[{ name, id }] - who is listening, so an indicator can name it."
+          },
+          {
+            "kind": "property",
+            "name": "screenApps",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "cameraInUse",
+            "type": "bool",
+            "default": "false",
+            "doc": "When fuser is missing the camera indicator stays off rather than guessing, and says so once. `cameraDetectable` lets a widget hide the indicator instead of showing a permanent \"off"
+          },
+          {
+            "kind": "property",
+            "name": "cameraApps",
+            "type": "var",
+            "default": "[]"
+          },
+          {
+            "kind": "property",
+            "name": "cameraDetectable",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "cameraAvailable",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "function",
+            "name": "refreshCamera",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "cameraNames",
+            "type": "var",
+            "default": "[]",
+            "doc": "What the cameras call themselves, for a tooltip."
+          },
+          {
+            "kind": "property",
+            "name": "anyActive",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.micInUse || root.cameraInUse || root.screenSharing",
+            "doc": "----------------------------------------------------------------- summary"
+          },
+          {
+            "kind": "property",
+            "name": "icon",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "What to show in a single pill, most alarming first."
+          },
+          {
+            "kind": "property",
+            "name": "summary",
+            "type": "string",
+            "readonly": true
+          }
+        ]
+      },
+      {
         "name": "PluginRegistry",
         "kind": "singleton",
         "extends": "Singleton",
@@ -2713,10 +5859,33 @@
           },
           {
             "kind": "property",
+            "name": "pluginPaths",
+            "type": "list<string>",
+            "readonly": true,
+            "doc": "The last of those is how out-of-tree plugins stay out of tree: the NixOS module points at them instead of copying them into the shell derivation, and a devMode checkout keeps worki"
+          },
+          {
+            "kind": "property",
+            "name": "userPluginsDir",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "The one path that is writable and outlives a rebuild."
+          },
+          {
+            "kind": "property",
             "name": "pluginsDir",
             "type": "string",
             "readonly": true,
-            "default": "`${Quickshell.shellDir}/plugins`"
+            "default": "root.pluginPaths[0]",
+            "doc": "The first path, kept as a property because the settings GUI offers to open it and launcher actions resolve scripts against a plugin's own directory."
+          },
+          {
+            "kind": "property",
+            "name": "pluginDirs",
+            "type": "var",
+            "default": "({})",
+            "doc": "id -> the directory that won. Written by rescan(), read by resolve() and by PluginManifest, so a plugin's files always resolve against the path it came from."
           },
           {
             "kind": "property",
@@ -2730,7 +5899,7 @@
             "name": "discovered",
             "type": "var",
             "default": "[]",
-            "doc": "Ids of every directory found under pluginsDir, whether or not its manifest parsed successfully."
+            "doc": "Ids of every directory found on any search path, whether or not its manifest parsed successfully."
           },
           {
             "kind": "property",
@@ -3002,6 +6171,13 @@
           },
           {
             "kind": "function",
+            "name": "dirOf",
+            "args": "pluginId: string",
+            "returns": "string",
+            "doc": "The directory a plugin was found in. Falls back to the first search path so that a caller asking about an unknown id gets a plausible path rather than \"undefined\"."
+          },
+          {
+            "kind": "function",
             "name": "get",
             "args": "pluginId: string",
             "returns": "var"
@@ -3108,6 +6284,18 @@
             "returns": "var"
           },
           {
+            "kind": "function",
+            "name": "scheduleRescan",
+            "returns": "void",
+            "doc": "Coalesces the incremental countChanged bursts a folder scan produces."
+          },
+          {
+            "kind": "function",
+            "name": "scannerReport",
+            "returns": "string",
+            "doc": "One line per search path: whether it exists and how many plugin directories are on it. Surfaced over IPC as `plugins scan`, because \"my plugin is not showing up\" has exactly three "
+          },
+          {
             "kind": "property",
             "name": "ipcTargets",
             "type": "var",
@@ -3172,6 +6360,281 @@
         ]
       },
       {
+        "name": "PluginStorage",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Persistent per-plugin state that is not a *setting*.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "stores",
+            "type": "var",
+            "default": "({})",
+            "doc": "pluginId -> store object. Long-lived: identity is what makes `store.values.x` a cheap binding, so stores are created once and never destroyed."
+          },
+          {
+            "kind": "property",
+            "name": "loaded",
+            "type": "bool",
+            "readonly": true,
+            "default": "PluginConfig.loaded",
+            "doc": "True once plugins.json has been read. A plugin that *acts* on stored state rather than binding to it has to wait for this, or it acts on empty storage once per startup and overwrit"
+          },
+          {
+            "kind": "function",
+            "name": "of",
+            "args": "pluginId: string",
+            "returns": "var"
+          },
+          {
+            "kind": "property",
+            "name": "storeComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          }
+        ]
+      },
+      {
+        "name": "PluginSystem",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Hardware telemetry, read from the kernel rather than parsed out of other programs.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "interval",
+            "type": "int",
+            "default": "2000",
+            "doc": "------------------------------------------------------------------ knobs"
+          },
+          {
+            "kind": "property",
+            "name": "diskInterval",
+            "type": "int",
+            "default": "30000"
+          },
+          {
+            "kind": "property",
+            "name": "paused",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "historyLength",
+            "type": "int",
+            "default": "60",
+            "doc": "Samples kept for the sparkline-style properties."
+          },
+          {
+            "kind": "property",
+            "name": "cpu",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "------------------------------------------------------------------- cpu"
+          },
+          {
+            "kind": "property",
+            "name": "memory",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "---------------------------------------------------------------- memory"
+          },
+          {
+            "kind": "property",
+            "name": "gpu",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "------------------------------------------------------------------- gpu"
+          },
+          {
+            "kind": "property",
+            "name": "network",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "--------------------------------------------------------------- network"
+          },
+          {
+            "kind": "property",
+            "name": "disks",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "----------------------------------------------------------------- disks"
+          },
+          {
+            "kind": "property",
+            "name": "cpuTempPath",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "------------------------------------------------------------ discovery Sensor and device paths found once at startup. Hardware does not come and go, and rescanning /sys every two s"
+          },
+          {
+            "kind": "property",
+            "name": "cpuFreqPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuCardPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuBusyPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuRc6Path",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuFreqPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuMaxFreqPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuTempPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuVramUsedPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "gpuVramTotalPath",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "discovered",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "function",
+            "name": "discover",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "hwmonByName",
+            "type": "var",
+            "default": "({})",
+            "doc": "hwmon is a flat list of numbered directories whose `name` file says what the sensor is. Walking it is how the CPU package temperature is found without shelling out to `sensors` and"
+          },
+          {
+            "kind": "function",
+            "name": "refresh",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "refreshDisks",
+            "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginTimer",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Time, without a Timer per idea.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "stats",
+            "type": "var",
+            "readonly": true
+          },
+          {
+            "kind": "function",
+            "name": "after",
+            "args": "delayMs: int, callback: var",
+            "returns": "var",
+            "doc": "------------------------------------------------------------- one-shot Runs `callback` once after `delayMs`. Returns a handle; stop() cancels it."
+          },
+          {
+            "kind": "function",
+            "name": "next",
+            "args": "callback: var",
+            "returns": "var",
+            "doc": "Runs on the next event loop turn - the way to escape \"cannot assign during binding evaluation\" without inventing a Timer with interval 0."
+          },
+          {
+            "kind": "function",
+            "name": "every",
+            "args": "intervalMs: int, callback: var",
+            "returns": "var",
+            "doc": "------------------------------------------------------------- repeating"
+          },
+          {
+            "kind": "function",
+            "name": "debounce",
+            "args": "callback: var, waitMs: int",
+            "returns": "var",
+            "doc": "------------------------------------------------------------- debounce Returns a function. Calling it (re)starts the wait; the callback runs `waitMs` after the last call, with the "
+          },
+          {
+            "kind": "function",
+            "name": "throttle",
+            "args": "callback: var, waitMs: int",
+            "returns": "var",
+            "doc": "First call runs immediately, then at most one call per `waitMs`. A trailing call is kept and runs at the end of the window, so the last value is never dropped."
+          },
+          {
+            "kind": "function",
+            "name": "cron",
+            "args": "expression: string, callback: var",
+            "returns": "var",
+            "doc": "------------------------------------------------------------------ cron Minute-resolution schedule. Returns a handle."
+          },
+          {
+            "kind": "function",
+            "name": "at",
+            "args": "timeOfDay: string, callback: var",
+            "returns": "var",
+            "doc": "\"07:30\" or \"7:30\" local time, daily."
+          },
+          {
+            "kind": "function",
+            "name": "stopAll",
+            "returns": "int",
+            "doc": "Stops and forgets everything. Used by `plugins reload`, where every plugin's closures are about to become stale."
+          },
+          {
+            "kind": "property",
+            "name": "handleComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
+          }
+        ]
+      },
+      {
         "name": "PluginUtils",
         "kind": "singleton",
         "extends": "Singleton",
@@ -3198,6 +6661,13 @@
             "args": "text: string",
             "returns": "void",
             "doc": "─────────────────────────────────────────────────────────── clipboard ── Quickshell owns a clipboard connection already, so this is an assignment. No wl-copy, no pipe, no escaping,"
+          },
+          {
+            "kind": "function",
+            "name": "copyTyped",
+            "args": "text: string, mimeType: string",
+            "returns": "void",
+            "doc": "This is the one clipboard operation that cannot be done in-process: Quickshell's clipboard is text/plain, and offering a different type means owning a Wayland data source. wl-copy "
           },
           {
             "kind": "function",
@@ -3236,7 +6706,7 @@
             "name": "run",
             "args": "command: var, callback: var",
             "returns": "void",
-            "doc": "Same, but hands stdout back. `callback(text, exitCode)`. The Process is parented to this singleton and destroyed when it finishes, so a plugin cannot leak one by forgetting."
+            "doc": "Same, but hands the output back: `callback(stdout, exitCode, stderr)`. The Process is parented to this singleton and destroyed when it finishes, so a plugin cannot leak one by forg"
           },
           {
             "kind": "function",
@@ -3263,6 +6733,159 @@
             "name": "truncate",
             "args": "text: string, limit: int",
             "returns": "string"
+          }
+        ]
+      },
+      {
+        "name": "PluginWM",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Windows, workspaces and monitors, without caring which compositor is running.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "compositor",
+            "type": "string",
+            "readonly": true,
+            "default": "WM.compositor"
+          },
+          {
+            "kind": "property",
+            "name": "supportsWorkspaces",
+            "type": "bool",
+            "readonly": true,
+            "default": "WM.workspaces.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "toplevel",
+            "type": "Toplevel",
+            "readonly": true,
+            "default": "ToplevelManager.activeToplevel",
+            "doc": "------------------------------------------------------------ active window"
+          },
+          {
+            "kind": "property",
+            "name": "activeWindow",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject"
+          },
+          {
+            "kind": "property",
+            "name": "windows",
+            "type": "var",
+            "readonly": true,
+            "default": "WM.windowList.map(window => (",
+            "doc": "------------------------------------------------------------------ lists [{ id, title, appId, workspaceId, focused, focus(), close() }]"
+          },
+          {
+            "kind": "property",
+            "name": "workspaces",
+            "type": "var",
+            "readonly": true,
+            "default": "WM.workspaces.map(workspace => (",
+            "doc": "[{ id, name, active, occupied, windows, focus() }]"
+          },
+          {
+            "kind": "property",
+            "name": "activeWorkspaceId",
+            "type": "int",
+            "readonly": true,
+            "default": "WM.activeWorkspace?.id ?? -1"
+          },
+          {
+            "kind": "property",
+            "name": "activeWorkspaceName",
+            "type": "string",
+            "readonly": true,
+            "default": "`${WM.activeWorkspace?.name ?? \"\"}`"
+          },
+          {
+            "kind": "property",
+            "name": "monitors",
+            "type": "var",
+            "readonly": true,
+            "default": "Quickshell.screens.map(screen =>",
+            "doc": "[{ name, width, height, scale, focused, x, y, screen }]"
+          },
+          {
+            "kind": "property",
+            "name": "focusedMonitor",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "function",
+            "name": "focusWorkspace",
+            "args": "id: int",
+            "returns": "void",
+            "doc": "--------------------------------------------------------------- control"
+          },
+          {
+            "kind": "function",
+            "name": "nextWorkspace",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "previousWorkspace",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "focusWindow",
+            "args": "id: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "closeWindow",
+            "args": "id: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "closeActive",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "moveWindowToWorkspace",
+            "args": "id: var, workspaceId: int",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "moveActiveToWorkspace",
+            "args": "workspaceId: int",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "monitorGeometry",
+            "args": "screen: var",
+            "returns": "var",
+            "doc": "Geometry of the monitor a QML item's window is on, in compositor coordinates."
+          },
+          {
+            "kind": "function",
+            "name": "isFullscreenOn",
+            "args": "monitorName: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "signal",
+            "name": "workspaceChanged",
+            "args": "int workspaceId",
+            "doc": "---------------------------------------------------------------- signals"
+          },
+          {
+            "kind": "signal",
+            "name": "windowFocused",
+            "args": "string appId, string title",
+            "doc": "Not `activeWindowChanged`: `activeWindow` is a property, so QML already generates a change signal by that name and declaring it again is a hard error at load time."
           }
         ]
       },
@@ -5162,14 +8785,6 @@
           "dragging": "bool",
           "_dragDiffX": "real",
           "_dragDiffY": "real"
-        }
-      },
-      {
-        "name": "DropShelf",
-        "extends": "Singleton",
-        "properties": {
-          "items": "var",
-          "maxItems": "int"
         }
       },
       {

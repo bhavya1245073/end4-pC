@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import qs
 import qs.modules.common
 import qs.modules.common.widgets
+import qs.core
 
 RippleButton {
     id: root
@@ -23,7 +24,7 @@ RippleButton {
     onClicked: {
         if (url) {
             Qt.openUrlExternally(url)
-            GlobalStates.sidebarLeftOpen = false
+            PanelRegistry.close("sidebarLeft")
         }
     }
 

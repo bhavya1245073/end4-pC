@@ -11,6 +11,7 @@ import Quickshell.Io
 import Quickshell.Bluetooth
 import Quickshell
 import Quickshell.Wayland
+import qs.core
 
 WindowDialog {
     id: root
@@ -60,7 +61,7 @@ WindowDialog {
             buttonText: Translation.tr("Details")
             onClicked: {
                 Quickshell.execDetached(["bash", "-c", `${Config.options.apps.bluetooth}`]);
-                GlobalStates.sidebarRightOpen = false;
+                PanelRegistry.close("sidebarRight");
             }
         }
 

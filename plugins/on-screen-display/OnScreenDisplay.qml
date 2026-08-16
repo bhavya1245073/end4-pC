@@ -36,7 +36,7 @@ Scope {
     }
 
     function triggerOsd(timeout) {
-        GlobalStates.osdVolumeOpen = true;
+        PanelRegistry.open("onScreenDisplay");
         // An indicator may ask for longer than the user's default - a pomodoro chime wants
         // a few seconds, a volume nudge does not. Held in a property rather than assigned
         // to the Timer, because assigning `interval` would break its binding to the
@@ -53,7 +53,7 @@ Scope {
         repeat: false
         running: false
         onTriggered: {
-            GlobalStates.osdVolumeOpen = false;
+            PanelRegistry.close("onScreenDisplay");
             root.protectionMessage = "";
         }
     }
@@ -100,7 +100,7 @@ Scope {
 
     Loader {
         id: osdLoader
-        active: GlobalStates.osdVolumeOpen
+        active: PanelRegistry.state("onScreenDisplay").open
 
         sourceComponent: PanelWindow {
             id: osdRoot
@@ -148,7 +148,7 @@ Scope {
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
-                        onEntered: GlobalStates.osdVolumeOpen = false
+                        onEntered: PanelRegistry.close("onScreenDisplay")
                     }
 
                     Column {
@@ -217,11 +217,11 @@ Scope {
         }
 
         function hide() {
-            GlobalStates.osdVolumeOpen = false;
+            PanelRegistry.close("onScreenDisplay");
         }
 
         function toggle() {
-            GlobalStates.osdVolumeOpen = !GlobalStates.osdVolumeOpen;
+            PanelRegistry.state("onScreenDisplay").open = !PanelRegistry.state("onScreenDisplay").open;
         }
     }
     CompositorGlobalShortcut {
@@ -237,7 +237,7 @@ Scope {
         description: "Hides volume OSD on press"
 
         onPressed: {
-            GlobalStates.osdVolumeOpen = false;
+            PanelRegistry.close("onScreenDisplay");
         }
     }
 }

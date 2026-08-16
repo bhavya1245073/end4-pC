@@ -9,6 +9,7 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import qs.modules.ii.background.widgets
+import qs.core
 
 AbstractBackgroundWidget {
     id: root
@@ -219,7 +220,7 @@ AbstractBackgroundWidget {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: GlobalStates.settingsOpen = true
+                            onClicked: PanelRegistry.open("settings")
                         }
                     }
 
@@ -239,7 +240,7 @@ AbstractBackgroundWidget {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: GlobalStates.sessionOpen = true
+                            onClicked: PanelRegistry.open("sessionScreen")
                         }
                     }
                 }

@@ -12,6 +12,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import qs.core
 
 Item {
     id: root
@@ -178,7 +179,7 @@ Item {
 
                     TrackChangeButton {
                         iconName: "lyrics"
-                        visible: !GlobalStates.sidebarRightOpen
+                        visible: !PanelRegistry.state("sidebarRight").open
                         downAction: () => root.toggleLyrics()
                     }
                 }

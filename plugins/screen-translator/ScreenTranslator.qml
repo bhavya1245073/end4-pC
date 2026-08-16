@@ -5,12 +5,13 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: root
 
     function dismiss() {
-        GlobalStates.screenTranslatorOpen = false
+        PanelRegistry.close("screenTranslator")
     }
 
     readonly property var currentScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? null
@@ -20,9 +21,9 @@ Scope {
         property var lockedScreen
         active: false
         Connections {
-            target: GlobalStates
-            function onScreenTranslatorOpenChanged() {
-                if (!GlobalStates.screenTranslatorOpen) {
+            target: PanelRegistry.state("screenTranslator")
+            function onOpenChanged() {
+                if (!PanelRegistry.state("screenTranslator").open) {
                     translatorLoader.active = false;
                 } else {
                     translatorLoader.lockedScreen = root.currentScreen
@@ -38,7 +39,7 @@ Scope {
     }
 
     function translate() {
-        GlobalStates.screenTranslatorOpen = true
+        PanelRegistry.open("screenTranslator")
     }
 
     IpcHandler {

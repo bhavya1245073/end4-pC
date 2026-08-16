@@ -4,6 +4,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 RippleButton {
     id: root
@@ -27,29 +28,29 @@ RippleButton {
     colBackgroundToggled: Appearance.colors.colSecondaryContainer
     colBackgroundToggledHover: Appearance.colors.colSecondaryContainerHover
     colRippleToggled: Appearance.colors.colSecondaryContainerActive
-    toggled: GlobalStates.sidebarLeftOpen
+    toggled: PanelRegistry.state("sidebarLeft").open
 
     onPressed: {
-        GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
+        PanelRegistry.toggle("sidebarLeft");
     }
 
     Connections {
         target: Ai
         function onResponseFinished() {
-            if (GlobalStates.sidebarLeftOpen) return;
+            if (PanelRegistry.state("sidebarLeft").open) return;
             root.showPing = true;
         }
     }
     Connections {
         target: Booru
         function onResponseFinished() {
-            if (GlobalStates.sidebarLeftOpen) return;
+            if (PanelRegistry.state("sidebarLeft").open) return;
             root.showPing = true;
         }
     }
     Connections {
-        target: GlobalStates
-        function onSidebarLeftOpenChanged() {
+        target: PanelRegistry.state("sidebarLeft")
+        function onOpenChanged() {
             root.showPing = false;
         }
     }

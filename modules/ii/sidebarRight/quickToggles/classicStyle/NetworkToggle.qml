@@ -7,6 +7,7 @@ import qs
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.core
 
 QuickToggleButton {
     toggled: Network.wifiStatus !== "disabled"
@@ -14,7 +15,7 @@ QuickToggleButton {
     onClicked: Network.toggleWifi()
     altAction: () => {
         Quickshell.execDetached(["bash", "-c", `${Network.ethernet ? Config.options.apps.networkEthernet : Config.options.apps.network}`])
-        GlobalStates.sidebarRightOpen = false
+        PanelRegistry.close("sidebarRight")
     }
     StyledToolTip {
         text: Translation.tr("%1 | Right-click to configure").arg(Network.networkName)

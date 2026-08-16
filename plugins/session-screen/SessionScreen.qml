@@ -10,6 +10,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: root
@@ -23,7 +24,7 @@ Scope {
 
     Loader {
         id: sessionLoader
-        active: GlobalStates.sessionOpen
+        active: PanelRegistry.state("sessionScreen").open
         onActiveChanged: {
             if (sessionLoader.active)
                 SessionWarnings.refresh();
@@ -33,7 +34,7 @@ Scope {
             target: GlobalStates
             function onScreenLockedChanged() {
                 if (GlobalStates.screenLocked) {
-                    GlobalStates.sessionOpen = false;
+                    PanelRegistry.close("sessionScreen");
                 }
             }
         }
@@ -45,7 +46,7 @@ Scope {
             property string subtitle
 
             function hide() {
-                GlobalStates.sessionOpen = false;
+                PanelRegistry.close("sessionScreen");
             }
 
             exclusionMode: ExclusionMode.Ignore
@@ -304,15 +305,15 @@ Scope {
         target: "session"
 
         function toggle(): void {
-            GlobalStates.sessionOpen = !GlobalStates.sessionOpen;
+            PanelRegistry.toggle("sessionScreen");
         }
 
         function close(): void {
-            GlobalStates.sessionOpen = false;
+            PanelRegistry.close("sessionScreen");
         }
 
         function open(): void {
-            GlobalStates.sessionOpen = true;
+            PanelRegistry.open("sessionScreen");
         }
     }
 
@@ -321,7 +322,7 @@ Scope {
         description: "Toggles session screen on press"
 
         onPressed: {
-            GlobalStates.sessionOpen = !GlobalStates.sessionOpen;
+            PanelRegistry.toggle("sessionScreen");
         }
     }
 
@@ -330,7 +331,7 @@ Scope {
         description: "Opens session screen on press"
 
         onPressed: {
-            GlobalStates.sessionOpen = true;
+            PanelRegistry.open("sessionScreen");
         }
     }
 
@@ -339,7 +340,7 @@ Scope {
         description: "Closes session screen on press"
 
         onPressed: {
-            GlobalStates.sessionOpen = false;
+            PanelRegistry.close("sessionScreen");
         }
     }
 }

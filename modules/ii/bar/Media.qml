@@ -12,6 +12,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import qs.core
 
 Item {
     id: root
@@ -100,7 +101,7 @@ Item {
             if (event.button === Qt.MiddleButton)      activePlayer?.togglePlaying()
             else if (event.button === Qt.BackButton)   activePlayer?.previous()
             else if (event.button === Qt.ForwardButton || event.button === Qt.RightButton) activePlayer?.next()
-            else if (event.button === Qt.LeftButton)   GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
+            else if (event.button === Qt.LeftButton)   PanelRegistry.toggle("mediaControls")
         }
     }
 

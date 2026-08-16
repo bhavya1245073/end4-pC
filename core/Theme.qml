@@ -32,6 +32,7 @@ import Quickshell
 import QtQuick
 import qs.modules.common
 import qs.modules.common.functions
+import "Palette.js" as Palette
 
 Singleton {
     id: root
@@ -193,6 +194,66 @@ Singleton {
         readonly property QtObject bounce: Appearance.animation.clickBounce
     }
 
+    // ---------------------------------------------------------------- motion
+    //
+    // The vocabulary above gives ready-made Behaviors; this gives the *numbers*, for the cases
+    // where an animation has to be written by hand - a stagger, a sequence, a transform.
+    //
+    //     NumberAnimation {
+    //         duration: Theme.motion.medium
+    //         easing.type: Easing.BezierSpline
+    //         easing.bezierCurve: Theme.motion.emphasized
+    //     }
+    //
+    // Four durations and five curves, deliberately few. Anything on screen at the same time as
+    // something else should move for the same length of time, or the two read as unrelated - and a
+    // plugin picking 220ms because it felt right is how a shell ends up feeling like six different
+    // programs.
+    //
+    // Enter is slower than exit on purpose (400 against 200): something arriving has to be
+    // understood, something leaving only has to get out of the way.
+    readonly property QtObject motion: QtObject {
+        // Durations, in milliseconds.
+        readonly property int instant: 90    // a state layer, a checkbox tick
+        readonly property int fast: Appearance.animationCurves.expressiveEffectsDuration       // 200 - hover, colour
+        readonly property int medium: Appearance.animationCurves.expressiveFastSpatialDuration // 350 - a card moving
+        readonly property int slow: Appearance.animationCurves.expressiveDefaultSpatialDuration // 500 - a panel opening
+
+        readonly property int enter: 400
+        readonly property int exit: 200
+
+        // Curves. `spatial` overshoots slightly, which is what makes movement feel physical;
+        // `effects` does not, which is what keeps a colour or opacity change from looking bouncy.
+        readonly property list<real> spatial: Appearance.animationCurves.expressiveDefaultSpatial
+        readonly property list<real> spatialFast: Appearance.animationCurves.expressiveFastSpatial
+        readonly property list<real> effects: Appearance.animationCurves.expressiveEffects
+        readonly property list<real> emphasized: Appearance.animationCurves.emphasized
+        readonly property list<real> decelerate: Appearance.animationCurves.emphasizedDecel
+        readonly property list<real> accelerate: Appearance.animationCurves.emphasizedAccel
+        readonly property list<real> standard: Appearance.animationCurves.standard
+
+        // How far a thing travels while appearing. Small: a big slide draws attention to the
+        // animation instead of to what arrived.
+        readonly property real slideDistance: 12
+
+        // Scale a card starts at when it appears, and drops to when pressed.
+        readonly property real enterScale: 0.94
+        readonly property real pressScale: 0.97
+
+        // Delay between neighbouring items in a staggered entrance. Six items at 28ms is 168ms of
+        // stagger, which reads as one gesture; at 60ms it reads as a queue.
+        readonly property int stagger: 28
+
+        // Cap on how many items are staggered. Beyond this everything animates together, because
+        // the last item of a long list would otherwise arrive noticeably late.
+        readonly property int staggerLimit: 8
+
+        // Stagger delay for item `index`, already capped.
+        function delay(index: int): int {
+            return Math.min(index, root.motion.staggerLimit) * root.motion.stagger;
+        }
+    }
+
     // ---------------------------------------------------------------- utilities
 
     // Same colour, more transparent. `amount` 0..1, where 1 is invisible.
@@ -227,5 +288,53 @@ Singleton {
     // a typo is a visible mistake rather than a crash.
     function role(name: string): color {
         return Appearance.colors[name] ?? Appearance.m3colors[name] ?? "transparent";
+    }
+
+    // ------------------------------------------------------- palettes at runtime
+
+    // A complete Material 3 palette derived from any colour: album art, a service's brand
+    // colour, a pixel of the wallpaper.
+    //
+    //     const palette = Theme.createPaletteFromColor(PluginMedia.artDominantColor)
+    //     Rectangle { color: palette.primaryContainer
+    //                 StyledText { color: palette.onPrimaryContainer } }
+    //
+    // Every Material 3 role is present and correctly paired, so text on a generated surface is
+    // readable by construction rather than by luck. `dark` defaults to the shell's current mode,
+    // so a generated palette matches the rest of the UI unless a caller says otherwise.
+    //
+    // Generating one is about ten milliseconds of arithmetic - six tonal palettes, twenty-seven
+    // gamut-mapped tones each. Fine on a track change, wrong per frame: cache it in a property.
+    function createPaletteFromColor(source: color, dark: var): var {
+        const isDark = dark === undefined ? Appearance.m3colors.darkmode : dark === true;
+        return Palette.schemeFromHex(root.__hexOf(source), isDark);
+    }
+
+    // Just the ramp: { hue, chroma, tones: { 0..100 }, tone(n) }. For a widget that wants five
+    // shades of one colour rather than a whole scheme.
+    function createTonalPalette(source: color): var {
+        return Palette.paletteFromHex(root.__hexOf(source));
+    }
+
+    // Perceptual lightness, 0..100 - the same axis the tones above are indexed by, so
+    // `Theme.toneOf(c) > 60` is a meaningful "is this a light colour".
+    function toneOf(source: color): real {
+        return Palette.toneOf(root.__hexOf(source));
+    }
+
+    // The more readable of two colours on `background`, by WCAG contrast ratio.
+    function mostReadable(background: color, candidates: var): color {
+        const hexes = (candidates ?? []).map(candidate => root.__hexOf(candidate));
+        if (hexes.length === 0)
+            return root.on(background);
+        return Palette.readableOn(root.__hexOf(background), hexes).color;
+    }
+
+    // QML hands colours over as `#aarrggbb`; the palette maths wants `#rrggbb`, and a caller may
+    // well pass a plain string already.
+    function __hexOf(value: var): string {
+        if (typeof value === "string")
+            return value;
+        return `${value}`;
     }
 }

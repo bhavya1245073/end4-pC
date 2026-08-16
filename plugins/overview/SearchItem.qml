@@ -9,6 +9,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Widgets
+import qs.core
 
 RippleButton {
     id: root
@@ -104,7 +105,7 @@ RippleButton {
     }
 
     onClicked: {
-        GlobalStates.overviewOpen = false
+        PanelRegistry.close("overview")
         root.itemExecute()
     }
     Keys.onPressed: (event) => {

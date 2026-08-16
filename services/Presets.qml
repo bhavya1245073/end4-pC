@@ -8,6 +8,7 @@ import Quickshell.Io
 import qs
 import qs.modules.common
 import qs.modules.common.functions
+import qs.core
 
 Singleton {
     id: root
@@ -58,7 +59,7 @@ Singleton {
     }
 
     function apply(name) {
-        GlobalStates.settingsOpen = false
+        PanelRegistry.close("settings")
         Wallpapers.confirmedPath = ""
         Wallpapers.previewPath = ""
         Quickshell.execDetached(["bash", Directories.presetsScriptPath, "--apply", name])

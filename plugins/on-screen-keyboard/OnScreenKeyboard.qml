@@ -9,6 +9,7 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope { // Scope
     id: root
@@ -24,7 +25,7 @@ Scope { // Scope
 
     Loader {
         id: oskLoader
-        active: GlobalStates.oskOpen
+        active: PanelRegistry.state("onScreenKeyboard").open
         onActiveChanged: {
             if (!oskLoader.active) {
                 Ydotool.releaseAllKeys();
@@ -42,7 +43,7 @@ Scope { // Scope
             }
 
             function hide() {
-                GlobalStates.oskOpen = false
+                PanelRegistry.close("onScreenKeyboard")
             }
             exclusiveZone: root.pinned ? implicitHeight - Appearance.sizes.hyprlandGapsOut : 0
             implicitWidth: oskBackground.width + Appearance.sizes.elevationMargin * 2
@@ -131,15 +132,15 @@ Scope { // Scope
         target: "osk"
 
         function toggle(): void {
-            GlobalStates.oskOpen = !GlobalStates.oskOpen;
+            PanelRegistry.toggle("onScreenKeyboard");
         }
 
         function close(): void {
-            GlobalStates.oskOpen = false
+            PanelRegistry.close("onScreenKeyboard")
         }
 
         function open(): void {
-            GlobalStates.oskOpen = true
+            PanelRegistry.open("onScreenKeyboard")
         }
     }
 
@@ -148,7 +149,7 @@ Scope { // Scope
         description: "Toggles on screen keyboard on press"
 
         onPressed: {
-            GlobalStates.oskOpen = !GlobalStates.oskOpen;
+            PanelRegistry.toggle("onScreenKeyboard");
         }
     }
 
@@ -157,7 +158,7 @@ Scope { // Scope
         description: "Opens on screen keyboard on press"
 
         onPressed: {
-            GlobalStates.oskOpen = true
+            PanelRegistry.open("onScreenKeyboard")
         }
     }
 
@@ -166,7 +167,7 @@ Scope { // Scope
         description: "Closes on screen keyboard on press"
 
         onPressed: {
-            GlobalStates.oskOpen = false
+            PanelRegistry.close("onScreenKeyboard")
         }
     }
 

@@ -45,6 +45,11 @@ Scope {
     // on the UI thread. See core/ComponentCache.qml.
     Prewarm {}
 
+    // The surface PluginDialogs.confirm/prompt/choose draw into. Core rather than a plugin:
+    // a confirmation that only appears when some optional plugin is enabled is worse than no
+    // confirmation, because the caller has already decided to ask.
+    PluginDialogHost {}
+
     // Singletons are created on first use, and an IpcHandler inside one does not exist
     // until the singleton does - so a shell nobody has touched has no `perf` or `plugins`
     // IPC target. Touching them here registers the targets. The profiler's sampling timer

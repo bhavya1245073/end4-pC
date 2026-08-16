@@ -20,9 +20,17 @@ import qs.modules.ii.sidebarRight.nightLight
 import qs.modules.ii.sidebarRight.volumeMixer
 import qs.modules.ii.sidebarRight.wifiNetworks
 import qs.modules.ii.sidebarRight.iconPicker
+import qs.core
 
 Item {
     id: root
+
+    // The player card here draws a spectrum, so it subscribes to one - which is also what keeps cava
+    // from running while the sidebar is closed.
+    readonly property PluginSpectrum sidebarSpectrum: PluginSpectrum {
+        active: PanelRegistry.state("sidebarRight").open
+    }
+
     property int sidebarWidth: Appearance.sizes.sidebarWidth
     property int sidebarPadding: 10
     property bool showAudioOutputDialog: false
@@ -34,7 +42,7 @@ Item {
     property bool showIconPickerDialog: false
 
     readonly property bool animatedEntrance: WM.compositor !== "hyprland"
-    readonly property bool sidebarOpen: GlobalStates.sidebarRightOpen
+    readonly property bool sidebarOpen: PanelRegistry.state("sidebarRight").open
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property var realPlayers: MprisController.players
@@ -50,9 +58,9 @@ Item {
     }
 
     Connections {
-        target: GlobalStates
-        function onSidebarRightOpenChanged() {
-            if (!GlobalStates.sidebarRightOpen) {
+        target: PanelRegistry.state("sidebarRight")
+        function onOpenChanged() {
+            if (!PanelRegistry.state("sidebarRight").open) {
                 root.showWifiDialog = false;
                 root.showBluetoothDialog = false;
                 root.showAudioOutputDialog = false;
@@ -159,7 +167,7 @@ Item {
                                     onClicked: (event) => {
                                         if (event.button === Qt.LeftButton) {
                                             fileChooser.running = true
-                                            GlobalStates.sidebarRightOpen = false
+                                            PanelRegistry.close("sidebarRight")
                                         } else if (event.button === Qt.RightButton) {
                                             Config.options.sidebar.bannerImage = ""
                                         }
@@ -257,11 +265,11 @@ Item {
                                     }
                                 }
                                 QuickToggleButton {
-                                    toggled: GlobalStates.settingsOpen
+                                    toggled: PanelRegistry.state("settings").open
                                     buttonIcon: "settings"
                                     onClicked: {
-                                        GlobalStates.sidebarRightOpen = false;
-                                        GlobalStates.settingsOpen = !GlobalStates.settingsOpen
+                                        PanelRegistry.close("sidebarRight");
+                                        PanelRegistry.toggle("settings")
                                     }
                                     StyledToolTip {
                                         text: Translation.tr("Settings")
@@ -270,7 +278,7 @@ Item {
                                 QuickToggleButton {
                                     toggled: false
                                     buttonIcon: "mode_off_on"
-                                    onClicked: GlobalStates.sessionOpen = true
+                                    onClicked: PanelRegistry.open("sessionScreen")
                                     StyledToolTip {
                                         text: Translation.tr("Session")
                                     }
@@ -312,7 +320,7 @@ Item {
             }
 
             Loader {
-                active: root.activePlayer !== null && GlobalStates.sidebarRightOpen && Config.options.sidebar.mediaPlayer
+                active: root.activePlayer !== null && PanelRegistry.state("sidebarRight").open && Config.options.sidebar.mediaPlayer
                 visible: active
                 Layout.fillWidth: true
                 Layout.topMargin: -10
@@ -321,7 +329,7 @@ Item {
                 Layout.rightMargin: -10
                 sourceComponent: Player {
                     player: root.activePlayer
-                    visualizerPoints: GlobalStates.visualizerPoints
+                    visualizerPoints: sidebarSpectrum.points
                     implicitHeight: 160
                     radius: Appearance.rounding.normal
                 }
@@ -519,11 +527,11 @@ Item {
                 }
             }
             QuickToggleButton {
-                toggled: GlobalStates.settingsOpen
+                toggled: PanelRegistry.state("settings").open
                 buttonIcon: "settings"
                 onClicked: {
-                    GlobalStates.sidebarRightOpen = false;
-                    GlobalStates.settingsOpen = !GlobalStates.settingsOpen
+                    PanelRegistry.close("sidebarRight");
+                    PanelRegistry.toggle("settings")
                 }
                 StyledToolTip {
                     text: Translation.tr("Settings")
@@ -532,7 +540,7 @@ Item {
             QuickToggleButton {
                 toggled: false
                 buttonIcon: "mode_off_on"
-                onClicked: GlobalStates.sessionOpen = true
+                onClicked: PanelRegistry.open("sessionScreen")
                 StyledToolTip {
                     text: Translation.tr("Session")
                 }

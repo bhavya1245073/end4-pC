@@ -6,6 +6,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.background.widgets
+import qs.core
 
 AbstractBackgroundWidget {
     id: root
@@ -14,7 +15,10 @@ AbstractBackgroundWidget {
 
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property bool isPlaying: activePlayer?.isPlaying ?? false
-    readonly property list<real> points: GlobalStates.visualizerPoints
+    // Declaring a PluginSpectrum is what starts the analyser, and destroying this widget stops it:
+    // cava runs while something is drawing it and not otherwise.
+    readonly property PluginSpectrum spectrum: PluginSpectrum {}
+    readonly property list<real> points: root.spectrum.points
 
     property real barWidth: 4
     property real barSpacing: 8

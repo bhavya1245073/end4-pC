@@ -9,6 +9,7 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import qs.core
 
 ButtonMouseArea {
     id: root
@@ -58,7 +59,7 @@ ButtonMouseArea {
         if (mouse.button == Qt.LeftButton)
             switchWorkspaceToHovered();
         else if (mouse.button == Qt.RightButton)
-            GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+            PanelRegistry.toggle("overview");
     }
     onWheel: event => {
         if (event.angleDelta.y < 0)

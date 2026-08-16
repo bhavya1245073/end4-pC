@@ -11,6 +11,7 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Wayland
+import qs.core
 
 Scope {
     id: root
@@ -236,7 +237,7 @@ Scope {
                                 Layout.fillHeight: true
                                 Layout.topMargin: 0
                                 visible: Config.options.dock.showAppsButton
-                                onClicked: GlobalStates.overviewOpen = !GlobalStates.overviewOpen
+                                onClicked: PanelRegistry.toggle("overview")
                                 topInset:    dockRow.padding + 10
                                 bottomInset: dockRow.padding + 7
                                 contentItem: MaterialSymbol {

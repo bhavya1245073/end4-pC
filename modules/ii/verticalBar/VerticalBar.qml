@@ -10,6 +10,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 Scope {
     id: bar
@@ -25,7 +26,7 @@ Scope {
         }
         LazyLoader {
             id: barLoader
-            active: GlobalStates.barOpen && !GlobalStates.screenLocked
+            active: PanelRegistry.state("bar").open && !GlobalStates.screenLocked
             required property ShellScreen modelData
             component: PanelWindow {
                 id: barRoot
@@ -256,24 +257,24 @@ Scope {
 
     IpcHandler {
         target: "bar"
-        function toggle(): void { GlobalStates.barOpen = !GlobalStates.barOpen }
-        function close(): void { GlobalStates.barOpen = false }
-        function open(): void { GlobalStates.barOpen = true }
+        function toggle(): void { PanelRegistry.toggle("bar") }
+        function close(): void { PanelRegistry.close("bar") }
+        function open(): void { PanelRegistry.open("bar") }
     }
 
     CompositorGlobalShortcut {
         name: "barToggle"
         description: "Toggles bar on press"
-        onPressed: { GlobalStates.barOpen = !GlobalStates.barOpen; }
+        onPressed: { PanelRegistry.toggle("bar"); }
     }
     CompositorGlobalShortcut {
         name: "barOpen"
         description: "Opens bar on press"
-        onPressed: { GlobalStates.barOpen = true; }
+        onPressed: { PanelRegistry.open("bar"); }
     }
     CompositorGlobalShortcut {
         name: "barClose"
         description: "Closes bar on press"
-        onPressed: { GlobalStates.barOpen = false; }
+        onPressed: { PanelRegistry.close("bar"); }
     }
 }

@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: root
@@ -16,9 +17,9 @@ Scope {
     property bool reallyOpen: false
 
     Connections {
-        target: GlobalStates
-        function onWallpaperSelectorOpenChanged() {
-            if (GlobalStates.wallpaperSelectorOpen) {
+        target: PanelRegistry.state("wallpaperSelector")
+        function onOpenChanged() {
+            if (PanelRegistry.state("wallpaperSelector").open) {
                 closeAnimTimer.stop();
                 root.reallyOpen = true;
             } else {
@@ -72,7 +73,7 @@ Scope {
             Connections {
                 target: GlobalFocusGrab
                 function onDismissed() {
-                    GlobalStates.wallpaperSelectorOpen = false;
+                    PanelRegistry.close("wallpaperSelector");
                 }
             }
 
@@ -93,9 +94,9 @@ Scope {
                 }
 
                 Connections {
-                    target: GlobalStates
-                    function onWallpaperSelectorOpenChanged() {
-                        if (!GlobalStates.wallpaperSelectorOpen) {
+                    target: PanelRegistry.state("wallpaperSelector")
+                    function onOpenChanged() {
+                        if (!PanelRegistry.state("wallpaperSelector").open) {
                             content.y = -content.height;
                         }
                     }
@@ -106,10 +107,10 @@ Scope {
                         duration: WM.compositor === "niri"
                             ? Appearance.animation.sidebarSlideEnter.duration
                             : Appearance.animation.sidebarSlideExit.duration
-                        easing.type: GlobalStates.wallpaperSelectorOpen
+                        easing.type: PanelRegistry.state("wallpaperSelector").open
                             ? Appearance.animation.sidebarSlideEnter.type
                             : Appearance.animation.sidebarSlideExit.type
-                        easing.bezierCurve: GlobalStates.wallpaperSelectorOpen
+                        easing.bezierCurve: PanelRegistry.state("wallpaperSelector").open
                             ? Appearance.animation.sidebarSlideEnter.bezierCurve
                             : Appearance.animation.sidebarSlideExit.bezierCurve
                     }
@@ -123,7 +124,7 @@ Scope {
             Wallpapers.openFallbackPicker(Appearance.m3colors.darkmode);
             return;
         }
-        GlobalStates.wallpaperSelectorOpen = !GlobalStates.wallpaperSelectorOpen
+        PanelRegistry.toggle("wallpaperSelector")
     }
 
     IpcHandler {

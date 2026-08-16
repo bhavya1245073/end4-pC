@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs.core
 
 Scope {
     id: root
@@ -19,12 +20,12 @@ Scope {
         property bool reallyVisible: false
         visible: reallyVisible
 
-        Component.onCompleted: reallyVisible = GlobalStates.sidebarRightOpen
+        Component.onCompleted: reallyVisible = PanelRegistry.state("sidebarRight").open
 
         Connections {
-            target: GlobalStates
-            function onSidebarRightOpenChanged() {
-                if (GlobalStates.sidebarRightOpen) {
+            target: PanelRegistry.state("sidebarRight")
+            function onOpenChanged() {
+                if (PanelRegistry.state("sidebarRight").open) {
                     closeAnimTimer.stop();
                     panelWindow.reallyVisible = true;
                 } else if (panelWindow.animatedEntrance) {
@@ -42,7 +43,7 @@ Scope {
         }
 
         function hide() {
-            GlobalStates.sidebarRightOpen = false;
+            PanelRegistry.close("sidebarRight");
         }
 
         onVisibleChanged: {
@@ -63,7 +64,7 @@ Scope {
         exclusiveZone: 0
         implicitWidth: sidebarWidth
         WlrLayershell.namespace: "quickshell:sidebarRight"
-        WlrLayershell.keyboardFocus: GlobalStates.sidebarRightOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+        WlrLayershell.keyboardFocus: PanelRegistry.state("sidebarRight").open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
         color: "transparent"
 
         anchors {
@@ -118,7 +119,7 @@ Scope {
                 width: sidebarWidth
                 clip: true
 
-                readonly property bool open: GlobalStates.sidebarRightOpen
+                readonly property bool open: PanelRegistry.state("sidebarRight").open
                 property real cachedParentWidth: sidebarWidth
                 readonly property real restX: cachedParentWidth - width
                 x: panelWindow.animatedEntrance ? (open ? restX : cachedParentWidth) : restX
@@ -163,7 +164,7 @@ Scope {
                     width: sidebarWidth - Appearance.sizes.hyprlandGapsOut - Appearance.sizes.elevationMargin
                     height: parent.height - Appearance.sizes.hyprlandGapsOut * 2
 
-                    focus: GlobalStates.sidebarRightOpen
+                    focus: PanelRegistry.state("sidebarRight").open
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_Escape) {
                             panelWindow.hide();
@@ -179,15 +180,15 @@ Scope {
             target: "sidebarRight"
 
             function toggle(): void {
-                GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+                PanelRegistry.toggle("sidebarRight");
             }
 
             function close(): void {
-                GlobalStates.sidebarRightOpen = false;
+                PanelRegistry.close("sidebarRight");
             }
 
             function open(): void {
-                GlobalStates.sidebarRightOpen = true;
+                PanelRegistry.open("sidebarRight");
             }
         }
 
@@ -196,7 +197,7 @@ Scope {
             description: "Toggles right sidebar on press"
 
             onPressed: {
-                GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+                PanelRegistry.toggle("sidebarRight");
             }
         }
         CompositorGlobalShortcut {
@@ -204,7 +205,7 @@ Scope {
             description: "Opens right sidebar on press"
 
             onPressed: {
-                GlobalStates.sidebarRightOpen = true;
+                PanelRegistry.open("sidebarRight");
             }
         }
         CompositorGlobalShortcut {
@@ -212,7 +213,7 @@ Scope {
             description: "Closes right sidebar on press"
 
             onPressed: {
-                GlobalStates.sidebarRightOpen = false;
+                PanelRegistry.close("sidebarRight");
             }
         }
     }

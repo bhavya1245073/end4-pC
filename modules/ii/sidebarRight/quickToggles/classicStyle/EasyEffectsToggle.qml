@@ -4,6 +4,7 @@ import qs.services
 import QtQuick
 import Quickshell.Io
 import Quickshell
+import qs.core
 
 QuickToggleButton {
     id: root
@@ -21,7 +22,7 @@ QuickToggleButton {
 
     altAction: () => {
         Quickshell.execDetached(["bash", "-c", "flatpak run com.github.wwmm.easyeffects || easyeffects"])
-        GlobalStates.sidebarRightOpen = false
+        PanelRegistry.close("sidebarRight")
     }
 
     StyledToolTip {

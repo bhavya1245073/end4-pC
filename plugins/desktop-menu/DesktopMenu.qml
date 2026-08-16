@@ -19,15 +19,12 @@ Scope {
 
     function openCentered(shouldOpen) {
         if (!shouldOpen) {
-            GlobalStates.desktopMenuOpen = false
+            PanelRegistry.close("desktopMenu")
             return
         }
         const focusedName = Hyprland.focusedMonitor?.name
         const screen = Quickshell.screens.find(s => s.name === focusedName) ?? Quickshell.screens[0]
-        GlobalStates.desktopMenuScreen = screen
-        GlobalStates.desktopMenuX = screen.width / 2
-        GlobalStates.desktopMenuY = screen.height / 2
-        GlobalStates.desktopMenuOpen = true
+        PanelRegistry.open("desktopMenu", { screen: screen, x: screen.width / 2, y: screen.height / 2 })
     }
 
     function displayPathFor(path) {
@@ -74,11 +71,14 @@ Scope {
 
     // Menu window
     Loader {
-        active: GlobalStates.desktopMenuOpen
+        active: PanelRegistry.state("desktopMenu").open
         sourceComponent: PanelWindow {
             id: menuWindow
 
-            screen: GlobalStates.desktopMenuScreen ?? Quickshell.screens[0]
+            // Where and on which monitor, from the open request.
+            readonly property var openArgs: PanelRegistry.state("desktopMenu").args
+
+            screen: menuWindow.openArgs.screen ?? Quickshell.screens[0]
 
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
@@ -93,53 +93,61 @@ Scope {
                 right: true
             }
 
-            property Component openSubmenuComponent: null
-            // A plugin's submenu arrives as a URL rather than a Component, since its QML
-            // lives outside this file and is not compiled into it.
+            // A submenu always arrives as a URL now - the shell's own two included - so there is
+            // one loader and one code path instead of a Component for built-ins and a URL for
+            // plugins.
             property string openSubmenuUrl: ""
-
-            // Declared at window scope rather than inside the list: GroupedList's default
-            // property takes Items, and a Component is not one.
-            Component {
-                id: wallpaperSubmenu
-                WallpaperSubmenu {}
-            }
-
-            Component {
-                id: widgetsSubmenu
-                WidgetsSubmenu {}
-            }
             property real submenuAnchorY: 0
             property real submenuWidth: 284
 
             Timer {
                 id: submenuCloseTimer
                 interval: 250
-                onTriggered: {
-                    menuWindow.openSubmenuComponent = null
-                    menuWindow.openSubmenuUrl = ""
-                }
+                onTriggered: menuWindow.openSubmenuUrl = ""
             }
 
             MouseArea {
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: GlobalStates.desktopMenuOpen = false
+                onClicked: PanelRegistry.close("desktopMenu")
             }
 
-            // Menu card 
+            // Menu card
+            //
+            // The shadow and the opaque backing are not decoration: this window floats over the
+            // wallpaper and over whatever application is behind it, and a translucent card with no
+            // shadow reads as part of that application rather than as a menu.
+            StyledRectangularShadow {
+                target: menuCard
+            }
+
             Rectangle {
                 id: menuCard
                 width: 348
                 implicitHeight: menuCol.implicitHeight + 16
-                x: Math.min(Math.max(GlobalStates.desktopMenuX - width / 2, 8), menuWindow.width - width - 8)
-                y: Math.min(Math.max(GlobalStates.desktopMenuY - implicitHeight / 2, 8), menuWindow.height - implicitHeight - 8)
+                x: Math.min(Math.max((menuWindow.openArgs.x ?? menuWindow.width / 2) - width / 2, 8), menuWindow.width - width - 8)
+                y: Math.min(Math.max((menuWindow.openArgs.y ?? menuWindow.height / 2) - implicitHeight / 2, 8), menuWindow.height - implicitHeight - 8)
                 radius: Appearance.rounding.verylarge
-                color: "transparent"
+                color: Theme.solid
+
+                // Grows from the pointer, not from its own middle: the menu appears where the click
+                // was, and scaling from the centre makes it look like it came from somewhere else.
+                transformOrigin: {
+                    const localX = (menuWindow.openArgs.x ?? menuWindow.width / 2) - menuCard.x;
+                    const localY = (menuWindow.openArgs.y ?? menuWindow.height / 2) - menuCard.y;
+                    const left = localX < menuCard.width / 3;
+                    const right = localX > menuCard.width * 2 / 3;
+                    const top = localY < menuCard.height / 3;
+                    const bottom = localY > menuCard.height * 2 / 3;
+                    if (top)
+                        return left ? Item.TopLeft : right ? Item.TopRight : Item.Top;
+                    if (bottom)
+                        return left ? Item.BottomLeft : right ? Item.BottomRight : Item.Bottom;
+                    return left ? Item.Left : right ? Item.Right : Item.Center;
+                }
 
                 scale: 0.85
                 opacity: 0
-                transformOrigin: Item.Center
 
                 Component.onCompleted: {
                     scale = 1.0
@@ -176,22 +184,18 @@ Scope {
                             model: root.carouselModel
                             onWallpaperSelected: (path) => {
                                 Wallpapers.select(path, Appearance.m3colors.darkmode)
-                                GlobalStates.desktopMenuOpen = false
+                                PanelRegistry.close("desktopMenu")
                             }
                         }
                     }
 
-                    // Every row in this menu, built-in and plugin alike, comes from
-                    // ContextMenuRegistry - so a plugin can add an item and place it
-                    // *between* built-in rows with `order`, rather than being appended
-                    // after them because the built-ins were hardcoded here.
+                    // Every row in this menu comes from ContextMenuRegistry - the shell's own and
+                    // every plugin's, in one list, sorted by `order`, rendered by one delegate.
                     //
-                    // The built-in rows keep their bespoke behaviour (hover-opened
-                    // submenus with anchor maths, a live DropShelf count) through the
-                    // `builtin` field: a manifest can express an icon, a label and an
-                    // action, and those rows need more than that. Everything a manifest
-                    // *can* express is handled by the generic branch, which is what a
-                    // plugin row uses.
+                    // There is deliberately no branch on which row this is. A submenu is a URL, an
+                    // action is ipc/panel/exec, a count is a bus topic; the shell's rows use the
+                    // same four verbs a manifest has, which is the only way to know a plugin row
+                    // can do everything a built-in one can.
                     GroupedList {
                         Layout.fillWidth: true
                         itemVerticalPadding: 16
@@ -204,15 +208,20 @@ Scope {
                                 id: menuRow
 
                                 required property var modelData
+                                required property int index
 
-                                readonly property string builtin: menuRow.modelData.builtin ?? ""
-                                readonly property bool opensSubmenu: menuRow.builtin === "wallpaper"
-                                    || menuRow.builtin === "widgets"
-                                    || (menuRow.modelData.url ?? "") !== ""
+                                readonly property bool opensSubmenu: ContextMenuRegistry.opensSubmenu(menuRow.modelData)
+                                readonly property var badge: ContextMenuRegistry.badgeValue(menuRow.modelData)
+                                readonly property bool hasBadge: menuRow.badge !== undefined && `${menuRow.badge}`.length > 0 && menuRow.badge !== 0
 
                                 implicitHeight: 40
                                 colBackground: "transparent"
                                 colBackgroundHover: Appearance.colors.colLayer2
+
+                                // Rows arrive one after another rather than all at once, which reads
+                                // as the menu unfolding instead of appearing fully formed. Capped by
+                                // Theme.motion so a long list does not end with a row arriving late.
+                                PluginAppear { index: menuRow.index }
 
                                 contentItem: RowLayout {
                                     anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
@@ -221,7 +230,13 @@ Scope {
                                     MaterialSymbol {
                                         text: menuRow.modelData.icon
                                         iconSize: Appearance.font.pixelSize.larger
-                                        color: Appearance.colors.colOnLayer1
+                                        // Picks up the accent under the pointer, so the row being
+                                        // acted on is obvious at a glance.
+                                        color: menuRow.hovered ? Theme.accent : Appearance.colors.colOnLayer1
+
+                                        Behavior on color {
+                                            animation: Theme.anim.fast.colorAnimation.createObject(this)
+                                        }
                                     }
 
                                     StyledText {
@@ -231,26 +246,30 @@ Scope {
                                         color: Appearance.colors.colOnLayer1
                                     }
 
-                                    // DropShelf shows how many items it is holding, and
-                                    // hides the chevron when it has some - the count is
-                                    // the more useful thing in the same space.
+                                    // A row with something to report shows it instead of the
+                                    // chevron - the count is the more useful thing in that space.
                                     StyledText {
-                                        visible: menuRow.builtin === "dropshelf" && DropShelf.items.length > 0
-                                        text: DropShelf.items.length
+                                        visible: menuRow.hasBadge
+                                        text: `${menuRow.badge}`
                                         font.pixelSize: Appearance.font.pixelSize.small
                                         color: Appearance.colors.colOnLayer1
                                         opacity: 0.6
                                     }
 
                                     MaterialSymbol {
-                                        visible: menuRow.opensSubmenu
-                                            || (menuRow.builtin === "dropshelf" && DropShelf.items.length === 0)
-                                            || menuRow.builtin === "livewallpaper"
-                                            || menuRow.builtin === "settings"
+                                        // A chevron means "there is more here", so only a submenu row
+                                        // gets one. A row that opens a panel or runs a command is an
+                                        // action, and marking it with a chevron promises a submenu
+                                        // that never appears.
+                                        visible: !menuRow.hasBadge && menuRow.opensSubmenu
                                         text: "chevron_right"
                                         iconSize: Appearance.font.pixelSize.normal
-                                        color: Appearance.colors.colOnLayer1
-                                        opacity: 0.4
+                                        color: menuRow.hovered ? Theme.accent : Appearance.colors.colOnLayer1
+                                        opacity: menuRow.hovered ? 0.8 : 0.4
+
+                                        Behavior on opacity {
+                                            animation: Theme.anim.fast.numberAnimation.createObject(this)
+                                        }
                                     }
                                 }
 
@@ -263,52 +282,15 @@ Scope {
                                         }
                                         submenuCloseTimer.stop()
                                         menuWindow.submenuAnchorY = menuCard.y + menuRow.mapToItem(menuCard, 0, 0).y
-                                        if (menuRow.builtin === "wallpaper") {
-                                            menuWindow.openSubmenuUrl = ""
-                                            menuWindow.openSubmenuComponent = wallpaperSubmenu
-                                        } else if (menuRow.builtin === "widgets") {
-                                            menuWindow.openSubmenuUrl = ""
-                                            menuWindow.openSubmenuComponent = widgetsSubmenu
-                                        } else {
-                                            // A plugin submenu arrives as a URL, so it is
-                                            // loaded rather than referenced.
-                                            menuWindow.openSubmenuComponent = null
-                                            menuWindow.openSubmenuUrl = menuRow.modelData.url
-                                        }
+                                        menuWindow.openSubmenuUrl = menuRow.modelData.url
                                     }
                                 }
 
                                 onClicked: {
-                                    switch (menuRow.builtin) {
-                                    case "wallpaper":
-                                    case "widgets":
-                                        // Hover already opened it; a click just dismisses.
-                                        GlobalStates.desktopMenuOpen = false
-                                        return
-                                    case "dropshelf":
-                                        GlobalStates.desktopMenuOpen = false
-                                        GlobalStates.dropShelfX = GlobalStates.desktopMenuX
-                                        GlobalStates.dropShelfY = GlobalStates.desktopMenuY
-                                        GlobalStates.dropShelfOpen = true
-                                        return
-                                    case "livewallpaper":
-                                        GlobalStates.desktopMenuOpen = false
-                                        Wallpapers.openFallbackPicker(
-                                            Appearance.m3colors.darkmode,
-                                            Config.options.wallpaperSelector.liveWallpapersPath ?? ""
-                                        )
-                                        return
-                                    case "settings":
-                                        GlobalStates.desktopMenuOpen = false
-                                        GlobalStates.settingsOpen = true
-                                        return
-                                    }
-
-                                    // Plugin row: ipc, exec, or a submenu that hover
-                                    // already opened. activate() returns false only for
-                                    // the submenu case, which should stay open.
-                                    if (ContextMenuRegistry.activate(menuRow.modelData))
-                                        GlobalStates.desktopMenuOpen = false
+                                    // activate() returns false only for a submenu row, which hover
+                                    // has already opened and a click should leave alone.
+                                    if (ContextMenuRegistry.activate(menuRow.modelData, menuWindow.openArgs))
+                                        PanelRegistry.close("desktopMenu")
                                 }
                             }
                         }
@@ -319,12 +301,9 @@ Scope {
             // SubMenu
             Loader {
                 id: submenuLoader
-                active: menuWindow.openSubmenuComponent !== null || menuWindow.openSubmenuUrl !== ""
+                active: menuWindow.openSubmenuUrl !== ""
                 width: menuWindow.submenuWidth
-                // Only one of these may be set at a time; a Loader with both a source and a
-                // sourceComponent is an error, so each is cleared when the other is used.
-                sourceComponent: menuWindow.openSubmenuComponent
-                source: menuWindow.openSubmenuComponent === null ? menuWindow.openSubmenuUrl : ""
+                source: menuWindow.openSubmenuUrl
 
                 x: (menuCard.x + menuCard.width + 8 + menuWindow.submenuWidth > menuWindow.width)
                     ? menuCard.x - menuWindow.submenuWidth - 8

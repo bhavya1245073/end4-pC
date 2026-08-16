@@ -9,13 +9,14 @@ import qs.modules.common.functions
 import qs.modules.common.widgets
 import qs.modules.common.widgets.widgetCanvas
 import "."
+import qs.core
 
 Rectangle {
     id: root
 
     property real padding: 8
 
-    opacity: GlobalStates.overlayOpen ? 1 : 0
+    opacity: PanelRegistry.state("overlay").open ? 1 : 0
     implicitWidth: contentRow.implicitWidth + (padding * 2)
     implicitHeight: contentRow.implicitHeight + (padding * 2)
     color: Appearance.m3colors.m3surfaceContainer

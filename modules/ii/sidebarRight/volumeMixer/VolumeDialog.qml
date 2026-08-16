@@ -7,6 +7,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Pipewire
+import qs.core
 
 WindowDialog {
     id: root
@@ -32,7 +33,7 @@ WindowDialog {
             buttonText: Translation.tr("Details")
             onClicked: {
                 Quickshell.execDetached(["bash", "-c", `${Config.options.apps.volumeMixer}`]);
-                GlobalStates.sidebarRightOpen = false;
+                PanelRegistry.close("sidebarRight");
             }
         }
 

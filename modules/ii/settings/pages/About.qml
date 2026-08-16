@@ -8,6 +8,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
+import qs.core
 
 ContentPage {
     forceWidth: true
@@ -20,7 +21,7 @@ ContentPage {
             "fish", "-i", "-l", "-c",
             "sudo nixos-rebuild switch --flake ~/nixos-pc#nixos --accept-flake-config"
         ])
-        Qt.callLater(() => GlobalStates.settingsOpen = false)
+        Qt.callLater(() => PanelRegistry.close("settings"))
     }
 
     function runUpdateDots() {
@@ -29,7 +30,7 @@ ContentPage {
             "bash", "-c",
             "nix flake update --flake ~/nixos-pc end4-pc && sudo nixos-rebuild switch --flake ~/nixos-pc#nixos --accept-flake-config"
         ])
-        Qt.callLater(() => GlobalStates.settingsOpen = false)
+        Qt.callLater(() => PanelRegistry.close("settings"))
     }
 
     Rectangle {

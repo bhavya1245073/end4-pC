@@ -9,9 +9,16 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
+import qs.core
 
 MouseArea {
     id: root
+
+    // Which wallpaper is being chosen - the desktop one or the lock screen one - comes from whoever
+    // opened the panel. Defaults to the desktop wallpaper, so opening it with no argument (a keybind,
+    // `qs ipc call panels open wallpaperSelector`) does the obvious thing.
+    readonly property string selectorTarget: PanelRegistry.state("wallpaperSelector").args.target ?? "wallpaper"
+
     property int columns: Config.options.wallpaperSelector.columns || 4
     property real previewCellAspectRatio: 4 / 3
     property bool useDarkMode: Appearance.m3colors.darkmode
@@ -59,11 +66,10 @@ MouseArea {
 
     function selectWallpaperPath(filePath) {
         if (filePath && filePath.length > 0) {
-            if (GlobalStates.wallpaperSelectorTarget === "lockWall") {
+            if (root.selectorTarget === "lockWall") {
                 Wallpapers.select(filePath, root.useDarkMode, finalPath => {
                     Config.options.background.lockWall = finalPath;
-                    GlobalStates.wallpaperSelectorTarget = "wallpaper";
-                    GlobalStates.wallpaperSelectorOpen = false;
+                    PanelRegistry.close("wallpaperSelector");
                 });
             } else {
                 // Stop preview FIRST so wallpaperPath reverts to the old wallpaper,
@@ -88,7 +94,7 @@ MouseArea {
     Keys.onPressed: event => {
         if (event.key === Qt.Key_Escape) {
             Wallpapers.stopPreview();
-            GlobalStates.wallpaperSelectorOpen = false;
+            PanelRegistry.close("wallpaperSelector");
             event.accepted = true;
         } else if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_V) {
             root.handleFilePasting(event);
@@ -435,11 +441,11 @@ MouseArea {
                                     implicitWidth: height
                                     onClicked: {
                                         Wallpapers.openFallbackPicker(root.useDarkMode);
-                                        GlobalStates.wallpaperSelectorOpen = false;
+                                        PanelRegistry.close("wallpaperSelector");
                                     }
                                     altAction: () => {
                                         Wallpapers.openFallbackPicker(root.useDarkMode);
-                                        GlobalStates.wallpaperSelectorOpen = false;
+                                        PanelRegistry.close("wallpaperSelector");
                                         Config.options.wallpaperSelector.useSystemFileDialog = true;
                                     }
                                     text: "open_in_new"
@@ -515,9 +521,9 @@ MouseArea {
                                     onAccepted: OnlineWallpapers.fetch()
                                     onActiveFocusChanged: root.filterFieldFocused = activeFocus
                                     Connections {
-                                        target: GlobalStates
-                                        function onWallpaperSelectorOpenChanged() {
-                                            if (!GlobalStates.wallpaperSelectorOpen) onlineSearchField.text = ""
+                                        target: PanelRegistry.state("wallpaperSelector")
+                                        function onOpenChanged() {
+                                            if (!PanelRegistry.state("wallpaperSelector").open) onlineSearchField.text = ""
                                         }
                                     }
                                     Keys.onPressed: event => {
@@ -540,7 +546,7 @@ MouseArea {
                             iconText: "close"
                             onClicked: {
                                 Wallpapers.stopPreview();
-                                GlobalStates.wallpaperSelectorOpen = false;
+                                PanelRegistry.close("wallpaperSelector");
                             }
                         }
                     }
@@ -550,14 +556,14 @@ MouseArea {
     }
 
     Connections {
-        target: GlobalStates
-        function onWallpaperSelectorOpenChanged() {
-            if (GlobalStates.wallpaperSelectorOpen && monitorIsFocused) {
+        target: PanelRegistry.state("wallpaperSelector")
+        function onOpenChanged() {
+            if (PanelRegistry.state("wallpaperSelector").open && monitorIsFocused) {
                 if (root.source === "local")
                     filterField.forceActiveFocus()
                 else
                     root.forceActiveFocus()
-            } else if (!GlobalStates.wallpaperSelectorOpen) {
+            } else if (!PanelRegistry.state("wallpaperSelector").open) {
                 Wallpapers.stopPreview();
             }
         }
@@ -567,7 +573,7 @@ MouseArea {
         target: Wallpapers
         function onChanged() {
             if (Config.options.wallpaperSelector.closeAfterSelection)
-                GlobalStates.wallpaperSelectorOpen = false;
+                PanelRegistry.close("wallpaperSelector");
         }
     }
 }

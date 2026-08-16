@@ -13,6 +13,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions as CF
+import qs.core
 
 Scope {
     id: root
@@ -21,21 +22,21 @@ Scope {
     property bool isMinimal: Config.options.settings.style === "minimal"
 
     Component.onCompleted: {
-        GlobalStates.settingsOpen = false;
+        PanelRegistry.close("settings");
     }
 
     PanelWindow {
         id: panelWindow
-        visible: GlobalStates.settingsOpen
+        visible: PanelRegistry.state("settings").open
 
         function hide() {
-            GlobalStates.settingsOpen = false;
+            PanelRegistry.close("settings");
         }
 
         exclusiveZone: 0
         WlrLayershell.namespace: "quickshell:settings"
         WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.keyboardFocus: GlobalStates.settingsOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+        WlrLayershell.keyboardFocus: PanelRegistry.state("settings").open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
         color: "transparent"
 
         anchors {
@@ -64,7 +65,7 @@ Scope {
         Rectangle {
             anchors.fill: parent
             color: "transparent"
-            opacity: GlobalStates.settingsOpen ? 1 : 0
+            opacity: PanelRegistry.state("settings").open ? 1 : 0
             z: 0
             Behavior on opacity {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -89,8 +90,8 @@ Scope {
             property bool userMoved: false
             anchors.centerIn: userMoved ? undefined : parent
 
-            opacity: GlobalStates.settingsOpen ? 1 : 0
-            scale: GlobalStates.settingsOpen ? 1 : 0.95
+            opacity: PanelRegistry.state("settings").open ? 1 : 0
+            scale: PanelRegistry.state("settings").open ? 1 : 0.95
 
             Behavior on opacity {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -161,14 +162,14 @@ Scope {
 
     IpcHandler {
         target: "settings"
-        function toggle(): void { GlobalStates.settingsOpen = !GlobalStates.settingsOpen; }
-        function open(): void   { GlobalStates.settingsOpen = true; }
-        function close(): void  { GlobalStates.settingsOpen = false; }
+        function toggle(): void { PanelRegistry.toggle("settings"); }
+        function open(): void   { PanelRegistry.open("settings"); }
+        function close(): void  { PanelRegistry.close("settings"); }
     }
 
     CompositorGlobalShortcut {
         name: "settingsToggle"
         description: "Toggles settings panel"
-        onPressed: GlobalStates.settingsOpen = !GlobalStates.settingsOpen;
+        onPressed: PanelRegistry.toggle("settings");
     }
 }

@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import qs.core
 
 Item { // Window
     id: root
@@ -92,7 +93,7 @@ Item { // Window
     ScreencopyView {
         id: windowPreview
         anchors.fill: parent
-        captureSource: GlobalStates.overviewOpen ? root.toplevel : null
+        captureSource: PanelRegistry.state("overview").open ? root.toplevel : null
         live: true
 
         // Color overlay for interactions
