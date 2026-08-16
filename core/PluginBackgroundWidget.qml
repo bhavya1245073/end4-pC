@@ -28,8 +28,11 @@ AbstractWidget {
     required property string pluginId
     required property string widgetId
 
-    readonly property real screenWidth: root.parent?.width ?? 0
-    readonly property real screenHeight: root.parent?.height ?? 0
+    // The canvas, not `parent`: the parent is the Loader that fetched this file, and a
+    // Loader takes its size from the item inside it, so `parent.width` is this widget's
+    // own width. Clamping a stored position against that gives zero every time.
+    readonly property real screenWidth: root.canvas?.width ?? 0
+    readonly property real screenHeight: root.canvas?.height ?? 0
     readonly property real scaledScreenWidth: root.screenWidth
     readonly property real scaledScreenHeight: root.screenHeight
     readonly property real wallpaperScale: 1

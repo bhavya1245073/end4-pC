@@ -386,4 +386,109 @@ if [[ "$*" == "." ]]; then
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Phase 5: required properties in anything loaded by URL.
+#
+# A component with an uninitialised `required` property cannot be constructed, so a
+# Loader resolving it from an id reports Loader.Error and you get an empty space. It
+# compiles, and Qt.createComponent succeeds - the failure is at instantiation - so no
+# phase above sees it.
+#
+# The declaration is usually not in the entry file but in a base type a few levels up,
+# which is where both real occurrences were: AbstractBackgroundWidget's five geometry
+# properties and AndroidQuickToggleButton's seven grid properties.
+# ---------------------------------------------------------------------------
+
+required_offenders=0
+
+root_type_of() {
+    # `|| true` throughout: a grep that matches nothing exits 1, and under
+    # `set -e -o pipefail` that aborts the whole script from inside a command
+    # substitution - silently, because the output is being captured.
+    {
+        sed 's#//.*##' "$1" \
+            | grep -oE '^[A-Za-z][A-Za-z0-9_]*[[:space:]]*\{' \
+            | head -1 \
+            | sed 's/[[:space:]]*{//'
+    } || true
+}
+
+file_for_type() {
+    local type="$1" near="$2" hit
+    [[ -n "$type" ]] || return 1
+    # Same directory first, which is how QML resolves it.
+    [[ -e "$near/$type.qml" ]] && { echo "$near/$type.qml"; return 0; }
+    hit="$(find . -name "$type.qml" -not -path './.git/*' | head -1)"
+    [[ -n "$hit" ]] && { echo "$hit"; return 0; }
+    return 1
+}
+
+check_no_required() {
+    local entry="$1"
+    local file="$entry"
+    local depth=0 type
+    local chain="" required="" unsatisfied=""
+
+    # Walk the inheritance chain, collecting it and every root-level `required property`.
+    # Root-level means indented exactly four spaces: a required property deeper than that
+    # belongs to a nested Repeater or Instantiator delegate, where it is not only legal
+    # but the recommended way to take modelData.
+    while [[ -n "$file" && -e "$file" ]] && (( depth < 6 )); do
+        chain+="$file"$'\n'
+        required+="$(grep -E '^    required[[:space:]]+property[[:space:]]' "$file" \
+            | sed -E 's/.*[[:space:]]([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*$/\1/' || true)"$'\n'
+        type="$(root_type_of "$file")"
+        file="$(file_for_type "$type" "$(dirname "$file")" || true)"
+        depth=$(( depth + 1 ))
+    done
+
+    # A required property is only a problem if nothing in the chain initialises it. A base
+    # type may perfectly well require something the concrete file always sets -
+    # PluginBackgroundWidget requires `pluginId`, and every plugin widget assigns it.
+    local prop
+    while read -r prop; do
+        [[ -n "$prop" ]] || continue
+        if ! grep -qhE "^[[:space:]]{4}$prop:" $chain 2>/dev/null; then
+            unsatisfied+="      $prop"$'\n'
+        fi
+    done < <(printf '%s' "$required" | sort -u)
+
+    if [[ -n "$unsatisfied" ]]; then
+        (( required_offenders == 0 )) && echo "==> Uninitialised required properties in URL-loaded components:"
+        required_offenders=$(( required_offenders + 1 ))
+        echo "    ${entry#"$ROOT/"}"
+        printf '%s' "$unsatisfied"
+    fi
+}
+
+if [[ "$*" == "." ]] && command -v jq >/dev/null 2>&1; then
+    while read -r target; do
+        [[ -n "$target" && -e "$target" ]] || continue
+        check_no_required "$target"
+    done < <(
+        for manifest in "$ROOT"/plugins/*/manifest.json; do
+            [[ -e "$manifest" ]] || continue
+            dir="$(dirname "$manifest")"
+            jq -r '(.provides // {}) | to_entries[] | .value[]? | .entry // empty' "$manifest" \
+                | while read -r e; do [[ -z "$e" ]] || echo "$dir/$e"; done
+        done
+        sed -n 's/.*path: "\([^"]*\)".*/\1/p' "$ROOT/core/DesktopWidgetRegistry.qml" \
+            | sed "s#^#$ROOT/modules/ii/background/widgets/#"
+        sed -n 's/.*android: "\([^"]*\)".*/\1/p' "$ROOT/core/QuickToggleRegistry.qml" \
+            | sed "s#^#$ROOT/modules/ii/sidebarRight/quickToggles/androidStyle/#"
+        sed -n 's/.*classic: "\([^"]*\)".*/\1/p' "$ROOT/core/QuickToggleRegistry.qml" \
+            | sed "s#^#$ROOT/modules/ii/sidebarRight/quickToggles/classicStyle/#"
+        sed -n 's/^[[:space:]]*{ id: "\([a-zA-Z]*\)".*/\1/p' "$ROOT/core/BarWidgetRegistry.qml" \
+            | while read -r id; do
+                printf '%s/modules/ii/bar/%s%s.qml\n' "$ROOT" "$(tr '[:lower:]' '[:upper:]' <<<"${id:0:1}")" "${id:1}"
+            done
+    )
+
+    if (( required_offenders )); then
+        status=1
+    else
+        echo "==> Required properties in URL-loaded components: all initialised"
+    fi
+fi
+
 exit "$status"

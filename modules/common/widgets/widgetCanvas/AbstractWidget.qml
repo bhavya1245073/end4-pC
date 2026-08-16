@@ -42,6 +42,26 @@ MouseArea {
         return null
     }
 
+    // The canvas this widget lives on, for subclasses that need its size.
+    //
+    // Resolved rather than assumed to be `parent`: widgets are loaded through a Loader,
+    // and a Loader takes its size from the item inside it, so `parent.width` is the
+    // widget's own width. Anything clamping a position against it therefore clamps to
+    // zero, which pins every widget to the top-left corner and makes dragging snap
+    // straight back.
+    //
+    // Resolved on completion because the walk needs the whole chain to exist, and
+    // `root.parent` does not change when the Loader above it gets parented, so a plain
+    // binding on `parent` would never re-evaluate.
+    property var canvas: null
+
+    function resolveCanvas() {
+        root.canvas = root.findCanvas(root.parent)
+    }
+
+    onParentChanged: root.resolveCanvas()
+    Component.onCompleted: root.resolveCanvas()
+
     function updateCenterHighlight() {
         var canvas = findCanvas(root.parent)
         if (!canvas) return

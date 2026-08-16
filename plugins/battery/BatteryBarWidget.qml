@@ -34,7 +34,7 @@ PluginBarWidget {
         PluginPopup {
             title: qsTr("Battery")
             subtitle: BatteryState.summary()
-            icon: BatteryState.charging ? "bolt" : BatteryState.critical ? "battery_alert" : BatteryState.pluggedIn ? "power_plug" : "battery_android_full"
+            icon: BatteryState.charging ? "bolt" : BatteryState.critical ? "battery_alert" : BatteryState.pluggedIn ? "power" : "battery_android_full"
             iconBlock: BatteryState.critical ? Theme.errorBlock : Theme.accentBlock
             iconColor: BatteryState.critical ? Theme.onErrorBlock : Theme.accent
 

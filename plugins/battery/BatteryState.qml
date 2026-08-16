@@ -72,11 +72,11 @@ Singleton {
         if (root.charging)
             return "bolt";
         if (root.full)
-            return "power_plug";
+            return "power";
         if (root.critical)
             return "battery_alert";
         if (root.pluggedIn)
-            return "power_plug";
+            return "power";
         return "";
     }
 

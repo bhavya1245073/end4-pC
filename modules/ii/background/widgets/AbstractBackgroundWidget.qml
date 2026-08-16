@@ -15,16 +15,19 @@ AbstractWidget {
     // have to inject it. (It used to be `required`, which meant every widget had to be
     // hand-wired by whoever loaded it - eleven near-identical blocks of it.) A host
     // that genuinely needs different numbers can still override them.
-    property real screenWidth: root.parent?.width ?? 0
-    property real screenHeight: root.parent?.height ?? 0
+    //
+    // `canvas`, not `parent`: the parent is the Loader that fetched this file, and a
+    // Loader is sized to the item inside it.
+    property real screenWidth: root.canvas?.width ?? 0
+    property real screenHeight: root.canvas?.height ?? 0
     property real scaledScreenWidth: root.screenWidth
     property real scaledScreenHeight: root.screenHeight
     property real wallpaperScale: 1
 
     // Set on the canvas by Background.qml when the wallpaper has been hidden for
-    // safety, so widgets can adapt. Read from the canvas for the same reason as the
-    // geometry above.
-    property bool wallpaperSafetyTriggered: root.parent?.wallpaperSafetyTriggered ?? false
+    // safety, so widgets can adapt. From the canvas for the same reason as the geometry
+    // above - the immediate parent is the Loader that fetched this file.
+    property bool wallpaperSafetyTriggered: root.canvas?.wallpaperSafetyTriggered ?? false
 
     // Ask the host to destroy and rebuild this widget. Any widget may emit it; the
     // host watches for it generically.
