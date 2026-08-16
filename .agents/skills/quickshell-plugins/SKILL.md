@@ -425,7 +425,9 @@ Invariants, each of which took a bug to learn:
   windows. Use `installedPanels` / `installedServices` /
   `installedDesktopWidgets` / `installedShortcuts` (they change only when a plugin
   appears or disappears on disk) and put the enabled state on the delegate:
-  `activeAsync: PluginRegistry.isActive(modelData.pluginId)`.
+  `activeAsync: PluginRegistry.isLoaded(modelData.pluginId)`. Read state with
+  `isActive()`; instantiate from `isLoaded()`, which lags a turn so the UI paints
+  the click before a heavy plugin blocks the thread loading.
 - **`LazyLoader.active: true` blocks the UI thread** until the component is fully
   loaded — Quickshell documents this. Use `activeAsync` for anything that is not
   needed this frame. (`Variants` has no async support, so a panel using it still

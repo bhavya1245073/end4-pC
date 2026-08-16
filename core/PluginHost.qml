@@ -19,6 +19,10 @@
 // therefore loaded synchronously, on the UI thread, at startup and on every toggle.
 // `activeAsync` loads in the gaps between frames instead.
 //
+// The models also key off `PluginRegistry.isLoaded` rather than `isActive`. That one
+// lags by an event-loop turn, so the frame acknowledging the click in the GUI gets
+// painted before a heavy plugin starts loading. See the registry for why.
+//
 // Together: toggling a plugin now flips one boolean and loads or unloads exactly that
 // plugin, without blocking. Note that a panel using `Variants` internally still
 // blocks while *it* loads - Quickshell documents that Variants has no async support -
@@ -44,7 +48,7 @@ Scope {
             required property var modelData
 
             source: modelData.url
-            activeAsync: Config.ready && PluginRegistry.isActive(modelData.pluginId)
+            activeAsync: Config.ready && PluginRegistry.isLoaded(modelData.pluginId)
         }
     }
 
@@ -57,7 +61,7 @@ Scope {
             required property var modelData
 
             source: modelData.url
-            activeAsync: Config.ready && PluginRegistry.isActive(modelData.pluginId)
+            activeAsync: Config.ready && PluginRegistry.isLoaded(modelData.pluginId)
         }
     }
 

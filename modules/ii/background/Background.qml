@@ -642,10 +642,14 @@ Variants {
                     model: PluginRegistry.installedDesktopWidgets
                     delegate: FadeLoader {
                         required property var modelData
-                        shown: PluginRegistry.isActive(modelData.pluginId)
+                        // isLoaded rather than isActive, so toggling a plugin paints
+                        // before its widget is built: FadeLoader is a plain Loader and
+                        // loads synchronously.
+                        shown: PluginRegistry.isLoaded(modelData.pluginId)
                             && PluginConfig.widgetEnabled(modelData.pluginId, modelData.id, modelData.enabledByDefault !== false)
                             && (Config.options.background.screenList.length === 0
                                 || Config.options.background.screenList.includes(bgRoot.screen.name))
+                        asynchronous: true
                         source: modelData.url
                     }
                 }

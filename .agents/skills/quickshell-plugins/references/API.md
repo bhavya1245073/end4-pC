@@ -327,6 +327,21 @@ Use `active` only when the component is needed this frame - a popup opening unde
 the cursor, say. `Variants` has no async support, so a component using it
 internally blocks while it loads regardless.
 
+### Loading is deferred one turn past `activeIds`
+
+`PluginRegistry.activeIds` updates synchronously when a plugin is toggled, so
+anything that merely *reads* which plugins are on is immediate. `loadedIds`
+follows 80 ms later, and that is what the loaders key off.
+
+Without it, clicking the switch in the GUI started the plugin loading in the same
+event-loop turn, so the frame showing the switch in its new position was never
+painted - the switch appeared to stick for as long as the load took, then snap.
+A plugin panel is a window containing `Variants`, which Quickshell cannot load
+asynchronously, so the load itself is unavoidably seconds of blocked UI thread.
+Yielding first does not make it faster; it makes the click acknowledged.
+
+Use `isActive()` to read state, `isLoaded()` to instantiate.
+
 ### Registration is coalesced
 
 `register()` writes into a pending map and a 30 ms timer publishes

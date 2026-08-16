@@ -43,7 +43,12 @@ ColumnLayout {
 
             // Unloaded, not merely hidden, when the plugin is off: the controls would
             // be wired to a plugin that is not running.
-            active: PluginRegistry.isActive(modelData.pluginId)
+            //
+            // `isLoaded`, not `isActive`, and asynchronous: this section is on the very
+            // page the user just clicked the switch on, so loading it synchronously in
+            // the same turn is what made the switch appear to stick.
+            active: PluginRegistry.isLoaded(modelData.pluginId)
+            asynchronous: true
 
             // A section whose file is missing should not take the page down with it.
             source: active ? (modelData.url ?? "") : ""

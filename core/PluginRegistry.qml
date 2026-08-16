@@ -195,6 +195,34 @@ Singleton {
         root.activeIds = ids;
     }
 
+    // Which plugins should have their components loaded. Follows `activeIds`, but one
+    // event-loop turn later.
+    //
+    // Flipping the switch in the GUI updates `activeIds` synchronously, and if loading
+    // started in that same turn the frame showing the switch in its new position never
+    // got painted - so the switch appeared to stick for as long as the plugin took to
+    // load, then snap over. A plugin panel is a window with `Variants` in it, which
+    // Quickshell cannot load asynchronously, so that is seconds of blocked UI thread
+    // and there is no making it instant. Yielding first at least means the click is
+    // acknowledged before the cost is paid.
+    //
+    // Anything that only *reads* which plugins are on (the bar, the launcher, the GUI)
+    // should use `activeIds` and stay immediate. This is for things that instantiate.
+    property var loadedIds: []
+
+    function isLoaded(pluginId: string): bool {
+        return root.loadedIds.includes(pluginId);
+    }
+
+    onActiveIdsChanged: loadTimer.restart()
+
+    Timer {
+        id: loadTimer
+        // Long enough to guarantee a paint, short enough to be invisible.
+        interval: 80
+        onTriggered: root.loadedIds = root.activeIds
+    }
+
     onPluginsChanged: root.recomputeActive()
 
     Connections {
