@@ -61,6 +61,20 @@ Singleton {
     readonly property var launcherActions: root.collect("launcherActions")
     readonly property var shortcuts: root.collect("shortcuts")
 
+    // The same lists over *installed* plugins, enabled or not.
+    //
+    // These exist so that things which instantiate one object per entry can use a
+    // model that does not change when a plugin is toggled. An Instantiator or
+    // Repeater over a plain JS array rebuilds every delegate when the array is
+    // reassigned, so a model derived from `active` meant that enabling one plugin
+    // destroyed and recreated every other plugin's panels and services - a freeze of
+    // a minute or more, and entirely avoidable. Depend on these and put the enabled
+    // state on the delegate's `active` instead, which is a cheap boolean flip.
+    readonly property var installedPanels: root.collectFrom(root.all, "panels")
+    readonly property var installedServices: root.collectFrom(root.all, "services")
+    readonly property var installedShortcuts: root.collectFrom(root.all, "shortcuts")
+    readonly property var installedDesktopWidgets: root.collectFrom(root.all, "desktopWidgets")
+
     // Sections a plugin injects into an existing settings page, rather than a whole
     // page of its own. This is what lets a plugin's settings live next to the related
     // built-in ones and, crucially, disappear when the plugin is switched off - a
@@ -68,10 +82,11 @@ Singleton {
     readonly property var settingsSections: root.collect("settingsSections")
 
     // Sections for one host page, in declared order. `page` matches the `page` field
-    // in the manifest, case-insensitively.
+    // in the manifest, case-insensitively. Installed rather than active, for the
+    // model-stability reason above; the host hides the ones whose plugin is off.
     function sectionsFor(page: string): var {
         const wanted = page.toLowerCase();
-        return root.settingsSections
+        return root.collectFrom(root.all, "settingsSections")
             .filter(section => (section.page ?? "").toLowerCase() === wanted)
             .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
     }
@@ -201,10 +216,18 @@ Singleton {
         }
         // Clearing here is safe: every manifest re-registers as the
         // Instantiator rebuilds its delegates from the new id list.
+        root.pending = ({});
         root.plugins = ({});
         root.errors = [];
         root.discovered = ids;
     }
+
+    // Manifests arrive one at a time, each from its own FileView. Assigning
+    // `root.plugins` per manifest meant twenty reassignments per scan, and every one
+    // of them invalidated `all`, `active` and all eight provides lists - so anything
+    // instantiating from those rebuilt twenty times over during startup. They are
+    // collected here and published in one go instead.
+    property var pending: ({})
 
     function register(pluginId: string, manifest: var) {
         if (typeof manifest !== "object" || manifest === null)
@@ -216,8 +239,7 @@ Singleton {
         if (declared > root.apiVersion || declared < root.minApiVersion)
             return root.reportError(pluginId, Translation.tr("needs plugin API v%1, this shell provides v%2").arg(declared).arg(root.apiVersion));
 
-        const plugins = Object.assign({}, root.plugins);
-        plugins[pluginId] = {
+        root.pending[pluginId] = {
             id: pluginId,
             name: manifest.name ?? pluginId,
             description: manifest.description ?? "",
@@ -230,7 +252,16 @@ Singleton {
             settings: Array.isArray(manifest.settings) ? manifest.settings : [],
             manifest: manifest
         };
-        root.plugins = plugins;
+
+        publishTimer.restart();
+    }
+
+    // Short, because it only has to outlast the burst of FileView loads. A plugin
+    // whose manifest arrives late still lands, in its own second publish.
+    Timer {
+        id: publishTimer
+        interval: 30
+        onTriggered: root.plugins = Object.assign({}, root.pending)
     }
 
     function reportError(pluginId: string, message: string) {

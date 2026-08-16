@@ -275,7 +275,8 @@ its settings.
 | `active` / `activeIds` | Enabled **and** supported here |
 | `errors` | `[{ id, message }]`, shown in the GUI |
 | `ready` | Discovery finished |
-| `panels`, `services`, `barWidgets`, `desktopWidgets`, `launcherActions`, `shortcuts`, `settingsPages`, `settingsSections` | Flattened across active plugins |
+| `panels`, `services`, `barWidgets`, `desktopWidgets`, `launcherActions`, `shortcuts`, `settingsPages`, `settingsSections` | Flattened across **active** plugins |
+| `installedPanels`, `installedServices`, `installedDesktopWidgets`, `installedShortcuts` | The same, over **installed** plugins. Use these as `Instantiator`/`Repeater` models |
 | `installedSettingsPages` | Including disabled, so the nav list is stable |
 | `sectionsFor(page)` | Sections for one host page, sorted |
 | `get(id)` | Descriptor or null |
@@ -284,6 +285,53 @@ its settings.
 | `isSupported(plugin)` / `unsupportedReason(plugin)` | `requires.compositor` |
 | `apiVersion` / `minApiVersion` | |
 | `pluginsDir` / `resolve(id, path)` | |
+
+---
+
+## Performance traps
+
+Both of these caused a one-to-two-minute freeze on toggling a plugin, and neither
+is visible from reading the code that suffers from it.
+
+### A JS-array model is rebuilt wholesale when reassigned
+
+`Instantiator` and `Repeater` cannot diff two plain JS arrays, so a reassigned
+model destroys and recreates **every** delegate. The active lists (`panels`,
+`services`, `desktopWidgets`, `settingsSections`) are reassigned whenever any
+plugin is toggled.
+
+```qml
+// wrong: toggling any plugin rebuilds every plugin's panels
+Instantiator {
+    model: PluginRegistry.panels
+    delegate: LazyLoader { active: true; source: modelData.url }
+}
+
+// right: the model changes only when a plugin is installed or removed
+Instantiator {
+    model: PluginRegistry.installedPanels
+    delegate: LazyLoader {
+        source: modelData.url
+        activeAsync: PluginRegistry.isActive(modelData.pluginId)
+    }
+}
+```
+
+### `LazyLoader.active` blocks
+
+Quickshell's docs: setting `active: true` "will force the component to load to
+completion, blocking the UI". `activeAsync` loads in the gaps between frames and
+behaves identically when set to false.
+
+Use `active` only when the component is needed this frame - a popup opening under
+the cursor, say. `Variants` has no async support, so a component using it
+internally blocks while it loads regardless.
+
+### Registration is coalesced
+
+`register()` writes into a pending map and a 30 ms timer publishes
+`PluginRegistry.plugins` once. Assigning per manifest meant twenty reassignments
+per scan, each invalidating `all`, `active` and all eight provides lists.
 
 ---
 

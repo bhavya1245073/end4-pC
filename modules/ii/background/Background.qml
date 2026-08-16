@@ -634,11 +634,16 @@ Variants {
                 // Desktop widgets contributed by plugins. They inherit
                 // PluginBackgroundWidget, which reads its geometry from the
                 // canvas, so there is nothing to inject here.
+                //
+                // Installed rather than active, so that toggling any plugin does not
+                // reassign this model and rebuild every plugin widget on the desktop;
+                // whether this one's plugin is on is part of `shown`.
                 Repeater {
-                    model: PluginRegistry.desktopWidgets
+                    model: PluginRegistry.installedDesktopWidgets
                     delegate: FadeLoader {
                         required property var modelData
-                        shown: PluginConfig.widgetEnabled(modelData.pluginId, modelData.id, modelData.enabledByDefault !== false)
+                        shown: PluginRegistry.isActive(modelData.pluginId)
+                            && PluginConfig.widgetEnabled(modelData.pluginId, modelData.id, modelData.enabledByDefault !== false)
                             && (Config.options.background.screenList.length === 0
                                 || Config.options.background.screenList.includes(bgRoot.screen.name))
                         source: modelData.url

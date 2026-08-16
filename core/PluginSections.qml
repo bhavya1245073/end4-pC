@@ -13,6 +13,12 @@
 // loaded is a row of controls wired to nothing.
 //
 // Each entry is a ContentSection (or anything that sizes itself), loaded lazily.
+//
+// The model is every *installed* section, not the active ones: a Repeater over a
+// reassigned JS array rebuilds all of its delegates, so an active-derived model made
+// toggling one plugin rebuild every section on the page. The enabled state is on the
+// Loader's `active` instead, which both collapses the section to nothing and costs a
+// boolean.
 
 import QtQuick
 import QtQuick.Layouts
@@ -35,9 +41,12 @@ ColumnLayout {
 
             Layout.fillWidth: true
 
+            // Unloaded, not merely hidden, when the plugin is off: the controls would
+            // be wired to a plugin that is not running.
+            active: PluginRegistry.isActive(modelData.pluginId)
+
             // A section whose file is missing should not take the page down with it.
-            source: modelData.url ?? ""
-            asynchronous: false
+            source: active ? (modelData.url ?? "") : ""
 
             onStatusChanged: {
                 if (status === Loader.Error)

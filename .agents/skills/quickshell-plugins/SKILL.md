@@ -415,8 +415,21 @@ Invariants, each of which took a bug to learn:
 - **A new `qs.*` import in plugin code goes in `PluginModuleAnchors.qml`.**
 - **Never name a file after a singleton.**
 - **`PluginRegistry.plugins` is reassigned, never mutated**, so bindings update.
-  `activeIds` only changes when the set really changes, so writing an unrelated
-  setting does not tear down loaded plugins.
+  Registration is coalesced through a timer so it publishes once per scan, not
+  once per manifest — twenty reassignments meant twenty rebuilds of everything
+  derived from it.
+- **Never use an active-derived registry list as an `Instantiator`/`Repeater`
+  model.** A model that is a plain JS array is rebuilt wholesale when the array is
+  reassigned, and `panels` / `services` / `desktopWidgets` are reassigned whenever
+  *any* plugin is toggled — so one toggle destroyed and recreated every plugin's
+  windows. Use `installedPanels` / `installedServices` /
+  `installedDesktopWidgets` / `installedShortcuts` (they change only when a plugin
+  appears or disappears on disk) and put the enabled state on the delegate:
+  `activeAsync: PluginRegistry.isActive(modelData.pluginId)`.
+- **`LazyLoader.active: true` blocks the UI thread** until the component is fully
+  loaded — Quickshell documents this. Use `activeAsync` for anything that is not
+  needed this frame. (`Variants` has no async support, so a panel using it still
+  blocks while it loads.)
 - **`Config.options.*` is a `JsonAdapter`** and drops keys it does not declare —
   which is why plugin settings live in `plugins.json` instead.
 - **A `MouseArea` in a layout is wrong.** It is an `Item`, so the layout gives it
