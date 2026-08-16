@@ -57,7 +57,7 @@ Item {
 
     // This plugin's settings from plugins.json, with manifest defaults filled in.
     // Live, so binding to `settings.foo` follows the GUI with no reload.
-    readonly property var settings: root.pluginId === "" ? ({}) : PluginConfig.of(root.pluginId)
+    readonly property var settings: PluginConfig.of(root.pluginId)
 
     // ----------------------------------------------------------------- colours
     //

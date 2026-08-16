@@ -52,7 +52,28 @@ Singleton {
     // setting never tears down loaded plugin components.
     property var activeIds: []
 
-    readonly property var active: root.all.filter(plugin => root.activeIds.includes(plugin.id))
+    // Membership as a map, because `isActive` is called from bindings all over the bar,
+    // the launcher and the settings GUI, and `Array.includes` on every one of them is a
+    // scan. Rebuilt only when the id list itself changes.
+    readonly property var activeSet: {
+        const set = ({});
+        for (const id of root.activeIds)
+            set[id] = true;
+        return set;
+    }
+
+    readonly property var loadedSet: {
+        const set = ({});
+        for (const id of root.loadedIds)
+            set[id] = true;
+        return set;
+    }
+
+    readonly property var active: root.all.filter(plugin => root.activeSet[plugin.id] === true)
+
+    // Bumped whenever anything the `collect` lists are derived from changes. Used as the
+    // memo key below.
+    readonly property int generation: root.active.length + Object.keys(root.plugins).length * 1000
 
     readonly property var panels: root.collect("panels")
     readonly property var services: root.collect("services")
@@ -71,10 +92,33 @@ Singleton {
     // destroyed and recreated every other plugin's panels and services - a freeze of
     // a minute or more, and entirely avoidable. Depend on these and put the enabled
     // state on the delegate's `active` instead, which is a cheap boolean flip.
-    readonly property var installedPanels: root.collectFrom(root.all, "panels")
-    readonly property var installedServices: root.collectFrom(root.all, "services")
-    readonly property var installedShortcuts: root.collectFrom(root.all, "shortcuts")
-    readonly property var installedDesktopWidgets: root.collectFrom(root.all, "desktopWidgets")
+    readonly property var installedPanels: root.collectInstalled("panels")
+    readonly property var installedServices: root.collectInstalled("services")
+    readonly property var installedShortcuts: root.collectInstalled("shortcuts")
+    readonly property var installedDesktopWidgets: root.collectInstalled("desktopWidgets")
+    readonly property var installedBarWidgets: root.collectInstalled("barWidgets")
+    readonly property var installedQuickToggles: root.collectInstalled("quickToggles")
+
+    // Same memo as `collect`, over installed plugins rather than active ones. Keyed on
+    // the plugin table, which changes only when a plugin appears or disappears on disk -
+    // so these lists keep their identity across a toggle, which is the whole reason they
+    // exist. See the note above.
+    property var installedCache: ({})
+    property var installedCacheKey: ""
+
+    function collectInstalled(kind: string): var {
+        const key = Object.keys(root.plugins).sort().join(",");
+        if (root.installedCacheKey !== key) {
+            root.installedCacheKey = key;
+            root.installedCache = ({});
+        }
+        const hit = root.installedCache[kind];
+        if (hit !== undefined)
+            return hit;
+        const computed = root.collectFrom(root.all, kind);
+        root.installedCache[kind] = computed;
+        return computed;
+    }
 
     // Sections a plugin injects into an existing settings page, rather than a whole
     // page of its own. This is what lets a plugin's settings live next to the related
@@ -87,7 +131,7 @@ Singleton {
     // model-stability reason above; the host hides the ones whose plugin is off.
     function sectionsFor(page: string): var {
         const wanted = page.toLowerCase();
-        return root.collectFrom(root.all, "settingsSections")
+        return root.collectInstalled("settingsSections")
             .filter(section => (section.page ?? "").toLowerCase() === wanted)
             .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
     }
@@ -99,13 +143,31 @@ Singleton {
     // uses this rather than `settingsPages` so that toggling a plugin doesn't
     // rebuild - and scroll-reset - the page you are toggling it from. Pages of
     // disabled plugins are shown greyed out by the GUI instead.
-    readonly property var installedSettingsPages: root.collectFrom(root.all, "settingsPages")
+    readonly property var installedSettingsPages: root.collectInstalled("settingsPages")
         .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
 
     // Flattens one `provides.<kind>` list across all active plugins, tagging
     // each entry with `pluginId` and resolving `entry` to an absolute `url`.
+    //
+    // Memoised on the active plugin list. `collect` is called from `find`, from
+    // `sectionsFor`, and from three registries' `all` bindings, so without a cache the
+    // same flatten-and-tag ran dozens of times for one toggle - each run allocating a
+    // fresh array, whose new identity then invalidated whatever read it.
+    property var collectCache: ({})
+    property var collectCacheKey: ""
+
     function collect(kind: string): var {
-        return root.collectFrom(root.active, kind);
+        const key = `${root.generation}:${root.activeIds.join(",")}`;
+        if (root.collectCacheKey !== key) {
+            root.collectCacheKey = key;
+            root.collectCache = ({});
+        }
+        const hit = root.collectCache[kind];
+        if (hit !== undefined)
+            return hit;
+        const computed = root.collectFrom(root.active, kind);
+        root.collectCache[kind] = computed;
+        return computed;
     }
 
     function collectFrom(plugins: var, kind: string): var {
@@ -162,7 +224,7 @@ Singleton {
     }
 
     function isActive(pluginId: string): bool {
-        return root.activeIds.includes(pluginId);
+        return root.activeSet[pluginId] === true;
     }
 
     function setEnabled(pluginId: string, enabled: bool) {
@@ -212,15 +274,40 @@ Singleton {
     property var loadedIds: []
 
     function isLoaded(pluginId: string): bool {
-        return root.loadedIds.includes(pluginId);
+        return root.loadedSet[pluginId] === true;
     }
 
-    onActiveIdsChanged: loadTimer.restart()
+    // True when every file a plugin provides has already been compiled, so switching it
+    // on costs only instantiation. See core/ComponentCache.qml.
+    function isWarm(pluginId: string): bool {
+        const plugin = root.plugins[pluginId];
+        if (!plugin)
+            return true;
+        for (const kind in plugin.provides) {
+            const entries = plugin.provides[kind];
+            if (!Array.isArray(entries))
+                continue;
+            for (const entry of entries) {
+                if (entry.entry && !ComponentCache.isWarm(root.resolve(pluginId, entry.entry)))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    onActiveIdsChanged: {
+        // The yield only has to be long enough to get a frame out. 80ms was sized for a
+        // cold compile happening immediately afterwards; once the plugin is pre-compiled
+        // the load is short enough that one frame of delay is plenty, and the toggle
+        // stops feeling deferred.
+        const cold = root.activeIds.some(id => !root.isWarm(id));
+        loadTimer.interval = cold ? 80 : 16;
+        loadTimer.restart();
+    }
 
     Timer {
         id: loadTimer
-        // Long enough to guarantee a paint, short enough to be invisible.
-        interval: 80
+        interval: 16
         onTriggered: root.loadedIds = root.activeIds
     }
 

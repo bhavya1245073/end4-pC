@@ -47,12 +47,12 @@ Singleton {
     // any plugin does not reassign this and make every Repeater over it rebuild every
     // delegate. Whether a given widget's plugin is switched on is a per-entry
     // question - see `available()`.
-    readonly property var all: {
+    readonly property var all: Stable.list("desktop.all", (() => {
         const out = root.builtins.map(w => ({
             id: w.id,
             name: w.name,
             icon: w.icon,
-            url: Qt.resolvedUrl("../modules/ii/background/widgets/" + w.path),
+            url: String(Qt.resolvedUrl("../modules/ii/background/widgets/" + w.path)),
             pluginId: "",
             showWhenLocked: w.showWhenLocked ?? false,
             enabledByDefault: false,
@@ -70,10 +70,10 @@ Singleton {
             });
         }
         return out;
-    }
+    })())
 
     function find(id: string): var {
-        return root.all.find(w => w.id === id) ?? null;
+        return Stable.index("desktop.all", root.all)[id] ?? null;
     }
 
     // Whether the widget can be shown at all, as opposed to whether the user has

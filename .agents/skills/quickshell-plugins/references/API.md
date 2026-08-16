@@ -442,12 +442,110 @@ list and cannot tell the difference.
 
 | Singleton | Holds |
 | --- | --- |
-| `BarWidgetRegistry` | `all`, `find`, `url`, `name`, `repeatable`, `wantsPill`, `pillColor` |
+| `BarWidgetRegistry` | `all`, `placeable()`, `find`, `url`, `name`, `repeatable`, `wantsPill`, `pillColor` |
 | `DesktopWidgetRegistry` | `all`, `find`, `available`, `installed`, `enabled`, `setEnabled`, `toggle` |
 | `QuickToggleRegistry` | `all`, `availableFor(style)`, `availableIds(style)`, `find`, `androidUrl`, `classicUrl`, `menuFor` |
 
 `available()` uses `isLoaded` (gating instantiation); `installed()` uses `isActive`
 (gating a GUI switch, which should track the click immediately).
+
+`all` on every registry is the **installed** set, not the enabled one, and it is
+identity-stable. Filter it for enabled-ness at the point of use (`placeable()`,
+`availableFor()`) rather than deriving a new list — see the performance rules below.
+
+---
+
+## Performance rules
+
+These are not micro-optimisations; each one is a bug that has already happened here,
+and each is invisible until the shell is doing something else at the same time.
+
+### A derived list must be identity-stable
+
+QML decides whether to rebuild a Repeater, an Instantiator's delegates, or re-run a
+binding by comparing the **identity** of a JS array, never its contents. So a derived
+list recomputed from an unrelated dependency hands every consumer a brand new array
+that happens to be equal to the old one — and they all rebuild.
+
+That is why enabling a *bar* plugin used to rebuild all seventeen quick toggles.
+Wrap derived lists in `Stable`:
+
+```qml
+readonly property var all: Stable.list("myRegistry.all", (() => {
+    ...compute...
+})())
+```
+
+`Stable.list(key, value)` returns the *previous* array when the new one serialises
+identically, so consumers never see a change that was not one. `Stable.ids()` is the
+cheaper version for arrays of plain strings, and `Stable.index(key, list)` gives an
+`id -> entry` map so a per-id lookup is not a scan.
+
+### Instantiate from `installed*`, read from `active`
+
+`PluginRegistry.installedPanels` and friends change only when a plugin appears or
+disappears **on disk**. Use them as `Instantiator`/`Repeater` models and put the
+enabled state on the delegate's `active`, which costs a boolean. A model derived from
+the active set is reassigned on every toggle, which destroys and recreates every other
+plugin's objects.
+
+Use `isActive()` to *read* whether a plugin is on, and `isLoaded()` to decide whether
+to *instantiate* it. `loadedIds` follows `activeIds` one frame later, so the frame that
+acknowledges the user's click gets painted before any loading starts.
+
+### `settings` has real properties — bind to the key, not the object
+
+`PluginConfig.of(id)` returns a long-lived object with one typed QML property per
+declared setting. Its identity does not change when a value changes, and assigning a
+typed property that already holds that value notifies nobody. So:
+
+```qml
+readonly property var settings: PluginConfig.of("myPlugin")
+text: root.settings.format          // re-evaluates only when `format` changes
+```
+
+Do not copy the bag into a new object, and do not build a settings map yourself: that
+reintroduces exactly the whole-config cascade this replaced, where one write re-ran
+every plugin's every binding.
+
+### Anything loaded by URL should be pre-compiled
+
+Setting `Loader.source` compiles the file and then instantiates it. The compile is the
+expensive half and it lands on the UI thread. `ComponentCache` compiles in the
+background, and because the engine caches compiled units per URL, a later
+`source: url` only pays instantiation.
+
+Everything reachable from a manifest or a built-in registry is warmed automatically by
+`core/Prewarm.qml`. If you add a new kind of thing loaded by URL, add it there.
+
+```qml
+ComponentCache.warm(url)        // queue it, compiled between frames
+ComponentCache.warmNow(url)     // jump the queue: the user is about to need it
+ComponentCache.isWarm(url)      // already compiled?
+ComponentCache.get(url)         // the Component, or null
+```
+
+Do not bind a long-lived `Loader.component` to `ComponentCache.get(url)`: it returns
+null until warm, and the change from null to a Component would reload an item that was
+already showing. Use `source: url` and let the cache work underneath.
+
+### Do not bind to `.length` of an array you mutate in place
+
+`push`/`shift`/`splice` on the array held by a `var` property emit nothing, so a
+binding like `readonly property bool idle: queue.length === 0` is evaluated once and
+then never again. `ComponentCache` shipped with exactly this bug and silently compiled
+nothing. Either reassign the array or use a function instead of a binding.
+
+### Measured cost of the above
+
+With the real bar, quick panel and 13 desktop widgets instantiated, toggling each of
+18 plugins off and on: **worst main-thread stall 38 ms, mean 13.8 ms, zero stalls over
+40 ms**. Click-to-loaded is one frame (16–19 ms). A settings write costs 0.08 ms, and
+20 000 settings reads through `of()` cost 4 ms in total.
+
+The harnesses that produce those numbers are `bench*.qml` patterns described under
+"Probing at runtime" — an 8 ms heartbeat timer whose gaps are, by definition, the UI
+thread being blocked.
 
 ## Two rules for anything loaded by URL
 

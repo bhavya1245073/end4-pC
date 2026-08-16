@@ -56,26 +56,26 @@ Singleton {
         { id: "launcherButton",        name: Translation.tr("Launcher Button"),     icon: "search" },
     ]
 
-    // Built-ins plus every active plugin's bar widgets. A plugin reusing a built-in id
-    // replaces it rather than appearing twice.
+    // Built-ins plus every *installed* plugin's bar widgets. A plugin reusing a built-in
+    // id replaces it rather than appearing twice.
     //
-    // Active rather than installed: unlike the desktop widget list, this is only read
-    // by JS functions and a settings-page list, never used as an Instantiator model,
-    // so reassigning it on toggle costs a binding re-evaluation rather than a rebuild
-    // of every widget.
-    readonly property var all: {
+    // Installed rather than active, and identity-stabilised: `url`, `wantsPill` and
+    // `pillColor` are called from every bar widget's bindings, so an identity change
+    // here re-evaluates all of them. Deriving from the active set meant every plugin
+    // toggle did that. A widget from a disabled plugin simply never gets asked for.
+    readonly property var all: Stable.list("bar.all", (() => {
         const list = root.builtins.map(w => ({
             id: w.id,
             name: w.name,
             icon: w.icon,
-            url: Qt.resolvedUrl("../modules/ii/bar/" + w.id.charAt(0).toUpperCase() + w.id.slice(1) + ".qml"),
+            url: String(Qt.resolvedUrl("../modules/ii/bar/" + w.id.charAt(0).toUpperCase() + w.id.slice(1) + ".qml")),
             pluginId: "",
             pill: w.pill !== false,
             pillColor: w.pillColor ?? "primaryContainer",
             repeatable: w.repeatable === true,
         }));
 
-        for (const w of PluginRegistry.barWidgets) {
+        for (const w of PluginRegistry.installedBarWidgets) {
             const entry = {
                 id: w.id,
                 name: w.name ?? w.id,
@@ -93,10 +93,18 @@ Singleton {
                 list.push(entry);
         }
         return list;
+    })())
+
+    // Widgets that can actually be placed right now: a plugin's widget disappears from
+    // the picker when the plugin is switched off, but stays in `all` so lookups for an
+    // already-placed one still resolve.
+    function placeable(): var {
+        return Stable.list("bar.placeable", root.all.filter(w =>
+            w.pluginId === "" || PluginRegistry.isActive(w.pluginId)));
     }
 
     function find(id: string): var {
-        return root.all.find(w => w.id === id) ?? null;
+        return Stable.index("bar.all", root.all)[id] ?? null;
     }
 
     function url(id: string): string {

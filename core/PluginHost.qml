@@ -40,6 +40,17 @@ Scope {
     // just present on disk, or its imports are never compiled. See the file.
     PluginModuleAnchors {}
 
+    // Compiles plugin and built-in widget files in the background, so switching a plugin
+    // on - or opening the quick panel for the first time - does not pay for compiling it
+    // on the UI thread. See core/ComponentCache.qml.
+    Prewarm {}
+
+    // Singletons are created on first use, and the profiler's IpcHandler does not exist
+    // until the singleton does - so a shell nobody has touched has no `perf` IPC target.
+    // Touching it here registers the target without starting the sampling timer, which
+    // stays off until asked. See core/Perf.qml.
+    Component.onCompleted: Perf.running
+
     // Non-visual, always-on objects (timers, watchers, IPC handlers).
     Instantiator {
         model: PluginRegistry.installedServices

@@ -52,19 +52,23 @@ Singleton {
         { id: "antiFlashbang",    android: "AndroidAntiFlashbangToggle.qml",    menu: "nightLight" },
     ]
 
-    // Built-ins plus every active plugin's toggles. A plugin reusing a built-in id
-    // replaces it.
-    readonly property var all: {
+    // Built-ins plus every *installed* plugin's toggles, whether enabled or not.
+    //
+    // Installed rather than active, and identity-stabilised, for the same reason as the
+    // other registries: this list is a Repeater model, so a new identity rebuilds every
+    // toggle in the panel. Deriving it from the active set meant enabling any plugin
+    // anywhere rebuilt all seventeen. Enabled state is applied by `availableFor` below.
+    readonly property var all: Stable.list("quickToggles.all", (() => {
         const list = root.builtins.map(t => ({
             id: t.id,
             pluginId: "",
-            android: t.android ? root.androidDir + t.android : "",
-            classic: t.classic ? root.classicDir + t.classic : "",
+            android: t.android ? String(root.androidDir) + t.android : "",
+            classic: t.classic ? String(root.classicDir) + t.classic : "",
             menu: t.menu ?? "",
             requires: t.requires ?? "",
         }));
 
-        for (const t of PluginRegistry.quickToggles) {
+        for (const t of PluginRegistry.installedQuickToggles) {
             const entry = {
                 id: t.id,
                 pluginId: t.pluginId,
@@ -83,22 +87,27 @@ Singleton {
                 list.push(entry);
         }
         return list;
-    }
+    })())
 
-    // Toggles usable on this compositor, for the style asked for.
+    // Toggles usable on this compositor, for the style asked for, from plugins that are
+    // switched on. Stabilised per style, so toggling an unrelated plugin leaves the
+    // panel's model untouched.
     function availableFor(style: string): var {
-        return root.all.filter(t => {
-            if (t.requires !== "" && WM.compositor !== t.requires) return false;
+        return Stable.list(`quickToggles.available.${style}`, root.all.filter(t => {
+            if (t.requires !== "" && WM.compositor !== t.requires)
+                return false;
+            if (t.pluginId !== "" && !PluginRegistry.isActive(t.pluginId))
+                return false;
             return (style === "classic" ? t.classic : t.android) !== "";
-        });
+        }));
     }
 
     function availableIds(style: string): var {
-        return root.availableFor(style).map(t => t.id);
+        return Stable.ids(`quickToggles.availableIds.${style}`, root.availableFor(style).map(t => t.id));
     }
 
     function find(id: string): var {
-        return root.all.find(t => t.id === id) ?? null;
+        return Stable.index("quickToggles.all", root.all)[id] ?? null;
     }
 
     function androidUrl(id: string): string {

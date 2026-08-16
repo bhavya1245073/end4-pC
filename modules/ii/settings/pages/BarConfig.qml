@@ -47,7 +47,7 @@ ContentPage {
             ...Config.options.bar.layouts.middleLayout,
             ...Config.options.bar.layouts.rightLayout
         ]
-        return BarWidgetRegistry.all.filter(w => {
+        return BarWidgetRegistry.placeable().filter(w => {
             if (w.id === "divisor" && Config.options.bar.borderless !== "transparent") return false
             return w.repeatable || !used.includes(w.id)
         })
