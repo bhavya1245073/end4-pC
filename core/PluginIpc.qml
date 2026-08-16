@@ -1,0 +1,59 @@
+// An IPC target owned by a plugin.
+//
+// Declare the file in the manifest:
+//
+//     "provides": {
+//         "ipc": [{ "entry": "GifIpc.qml" }]
+//     }
+//
+// and make its root a PluginIpc:
+//
+//     PluginIpc {
+//         target: "gifs"
+//
+//         function open(): void {
+//             GifPicker.open();
+//         }
+//
+//         function search(query: string): void {
+//             GifPicker.search(query);
+//         }
+//     }
+//
+// Every function declared on it becomes a command:
+//
+//     qs -c end4-pC ipc call gifs open
+//     qs -c end4-pC ipc call gifs search "cat"
+//
+// which also means it is bindable from the compositor without any keybind support from
+// the shell at all:
+//
+//     bind = SUPER, G, exec, qs -c end4-pC ipc call gifs open
+//
+// though `provides.shortcuts` is better for that - it gets you a `quickshell:` global,
+// which the compositor dispatches without spawning a process. See PluginShortcut.
+//
+// ## Rules
+//
+// Annotate parameters and return types. Quickshell's IPC layer needs the types to
+// marshal a call from the command line, and an unannotated function is not exposed.
+// `void` is a real return type here; say so.
+//
+// `target` defaults to the plugin's id, so two plugins cannot silently collide, and the
+// registry refuses a target that a built-in already owns.
+
+import QtQuick
+import Quickshell.Io
+
+IpcHandler {
+    id: root
+
+    // Set by the host from the manifest, so a plugin does not have to repeat its own id.
+    property string pluginId: ""
+
+    // Defaults to the plugin id. Override for a nicer command name.
+    target: root.pluginId
+
+    // Handlers are only reachable while the plugin is on; the host binds this.
+    enabled: true
+}

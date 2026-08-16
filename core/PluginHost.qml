@@ -45,11 +45,14 @@ Scope {
     // on the UI thread. See core/ComponentCache.qml.
     Prewarm {}
 
-    // Singletons are created on first use, and the profiler's IpcHandler does not exist
-    // until the singleton does - so a shell nobody has touched has no `perf` IPC target.
-    // Touching it here registers the target without starting the sampling timer, which
-    // stays off until asked. See core/Perf.qml.
-    Component.onCompleted: Perf.running
+    // Singletons are created on first use, and an IpcHandler inside one does not exist
+    // until the singleton does - so a shell nobody has touched has no `perf` or `plugins`
+    // IPC target. Touching them here registers the targets. The profiler's sampling timer
+    // stays off until asked. See core/Perf.qml and core/PluginCommands.qml.
+    Component.onCompleted: {
+        Perf.running;
+        PluginCommands.objectName;
+    }
 
     // Non-visual, always-on objects (timers, watchers, IPC handlers).
     Instantiator {
@@ -73,6 +76,26 @@ Scope {
 
             source: modelData.url
             activeAsync: Config.ready && PluginRegistry.isLoaded(modelData.pluginId)
+        }
+    }
+
+    // IPC targets plugins register, so a plugin can add its own commands:
+    //
+    //     qs -c end4-pC ipc call gifs open
+    //
+    // Loaded like a service, but with the plugin's id pushed in so a handler can default
+    // its target to it. See core/PluginIpc.qml.
+    Instantiator {
+        model: PluginRegistry.installedIpc
+
+        delegate: PluginLoader {
+            required property var modelData
+
+            pluginId: modelData.pluginId
+            entry: PluginRegistry.isLoaded(modelData.pluginId) ? modelData.url : ""
+            inject: ({
+                pluginId: modelData.pluginId
+            })
         }
     }
 

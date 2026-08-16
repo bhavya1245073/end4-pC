@@ -74,6 +74,7 @@ Singleton {
 
     readonly property var panels: root.collect("panels")
     readonly property var services: root.collect("services")
+    readonly property var ipc: root.collect("ipc")
     readonly property var barWidgets: root.collect("barWidgets")
     readonly property var desktopWidgets: root.collect("desktopWidgets")
     readonly property var launcherActions: root.collect("launcherActions")
@@ -91,6 +92,7 @@ Singleton {
     // state on the delegate's `active` instead, which is a cheap boolean flip.
     readonly property var installedPanels: root.collectInstalled("panels")
     readonly property var installedServices: root.collectInstalled("services")
+    readonly property var installedIpc: root.collectInstalled("ipc")
     readonly property var installedShortcuts: root.collectInstalled("shortcuts")
     readonly property var installedDesktopWidgets: root.collectInstalled("desktopWidgets")
     readonly property var installedBarWidgets: root.collectInstalled("barWidgets")

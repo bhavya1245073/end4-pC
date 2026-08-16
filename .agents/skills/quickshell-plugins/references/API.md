@@ -584,3 +584,66 @@ Loader {
 function find(id: string): var { ... }   // right
 function find(id: string) { ... }        // logs "insufficiently annotated" per call
 ```
+
+---
+
+## Commands and keybinds
+
+### `PluginIpc` — a plugin's own command line
+
+`provides.ipc` entries are files whose root is a `PluginIpc`. Every annotated function on
+it becomes a command.
+
+```qml
+import qs.core
+
+PluginIpc {
+    target: "gifs"                  // defaults to the plugin id
+
+    function open(): void { GifPicker.open(); }
+    function search(query: string): void { GifPicker.search(query); }
+}
+```
+
+```
+qs -c end4-pC ipc call gifs open
+qs -c end4-pC ipc call gifs search "cat"
+```
+
+**Annotate parameter and return types, `void` included.** Quickshell needs them to
+marshal a call from the command line; an unannotated function is not exposed at all, with
+no error to tell you so.
+
+`target` defaults to the plugin id so two plugins cannot collide by accident.
+
+### Keybinds
+
+`provides.shortcuts` registers `quickshell:<id>`, which the compositor dispatches
+straight to the running shell — no process spawn, unlike binding `qs ipc call`. Give the
+entry `exec` (argv) or `ipc` (`{ target, function }`) and no QML is needed.
+
+Nothing edits your compositor config. To find out what to write:
+
+```
+qs -c end4-pC ipc call plugins shortcuts   # declared keybinds + the exact bind line
+qs -c end4-pC ipc call plugins commands    # IPC targets plugins own
+qs -c end4-pC ipc call plugins list        # installed plugins, on/off, what they provide
+```
+
+`plugins/battery` is the worked example.
+
+## Never unload something expensive to make it disappear
+
+`PluginSections` used `active: isLoaded(pluginId)` so a switched-off plugin's settings
+section vanished. Measured in the real settings window, that cost **390 ms of blocked UI
+thread per toggle, 48% of a five-second window**, while a plugin with no settings section
+cost 13 ms — which is exactly why some plugins felt laggy to toggle and others did not,
+for reasons that had nothing to do with the plugins.
+
+A settings section is a few dozen controls. Build it once, then only change `visible`.
+Qt Quick Layouts exclude invisible items, so a hidden section collapses exactly as if it
+had been unloaded, and `asynchronous: true` is not a substitute — the incubator still
+does its work on this thread.
+
+The general rule: unloading is for things that cost something to *keep*, not for things
+that cost something to *build*.

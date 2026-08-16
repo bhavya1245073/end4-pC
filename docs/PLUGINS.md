@@ -105,7 +105,8 @@ Every `entry` is a path relative to the plugin folder.
 | `settingsSections` | A section injected into an **existing** settings page, named by `page`. Unlike a page, it *disappears* when the plugin is switched off - which is why every stock panel's settings live in the plugin rather than in the core page. |
 | `launcherActions` | `>`-prefixed launcher action. Either `exec` (argv array) or `script` (path inside the plugin). Anything typed after the action name is appended as arguments. |
 | `quickToggles` | A tile in the sidebar's quick settings panel. Inherit `AndroidQuickToggleButton` and it works in both panel styles; supply `classicEntry` if you want a different file for the classic style. `menu` names a dialog its expand arrow opens (`wifi`, `bluetooth`, `nightLight`, `audioOutput`, `audioInput`); `requires` limits it to one compositor. Appears in the unused-toggle tray, draggable into the grid like any built-in. |
-| `shortcuts` | A keybind, registered as `quickshell:<id>`. Give it `exec` (argv array) or `ipc` (`{ target, function }`) and the shell handles it with no QML from you. `suggestedKey` is documentation, shown in the plugin's page under **Keybinds**; nothing binds a key for you. Omit both `exec` and `ipc` to declare a shortcut you handle yourself with `CompositorGlobalShortcut`. |
+| `shortcuts` | A keybind, registered as `quickshell:<id>`. Give it `exec` (argv array) or `ipc` (`{ target, function }`) and the shell handles it with no QML from you. `suggestedKey` is documentation, shown in the plugin's page under **Keybinds** and by `ipc call plugins shortcuts`; nothing binds a key for you. Omit both `exec` and `ipc` to declare a shortcut you handle yourself with `CompositorGlobalShortcut`. |
+| `ipc` | Commands on the shell's command line. Root type: `PluginIpc`. Every annotated function becomes `qs -c end4-pC ipc call <target> <function>`; `target` defaults to the plugin id. See below. |
 
 Ids must be unique across plugins for the same kind. A `barWidgets`,
 `desktopWidgets` or `quickToggles` entry that reuses a built-in id (`clockWidget`,
@@ -125,6 +126,70 @@ shell ships can be replaced, and anything a plugin adds is a first-class citizen
 
 None of these are consulted by more than one host. If you find yourself adding a
 widget in two places, one of them is wrong.
+
+### Commands and keybinds
+
+A plugin can add its own commands to the shell's command line. Point the manifest at a
+file whose root is a `PluginIpc`:
+
+```json
+"provides": { "ipc": [{ "entry": "GifIpc.qml" }] }
+```
+
+```qml
+import qs.core
+
+PluginIpc {
+    target: "gifs"                       // defaults to the plugin id
+
+    function open(): void {
+        GifPicker.open();
+    }
+
+    function search(query: string): void {
+        GifPicker.search(query);
+    }
+}
+```
+
+```
+qs -c end4-pC ipc call gifs open
+qs -c end4-pC ipc call gifs search "cat"
+```
+
+Annotate parameters and return types - `void` included. Quickshell needs the types to
+marshal a call, and an unannotated function is not exposed at all.
+
+For a keybind, prefer `provides.shortcuts` over binding a shell command. A shortcut is
+registered as a `quickshell:` global, which the compositor dispatches straight to the
+running shell instead of spawning a process:
+
+```json
+"shortcuts": [{
+    "id": "gifPicker",
+    "description": "Open the GIF picker",
+    "suggestedKey": "SUPER, plus",
+    "ipc": { "target": "gifs", "function": "open" }
+}]
+```
+
+```conf
+# hyprland
+bind = SUPER, plus, global, quickshell:gifPicker
+```
+
+Nothing binds a key for you - the shell has no business editing your compositor config -
+but it will tell you exactly what to write:
+
+```
+qs -c end4-pC ipc call plugins shortcuts    # every declared keybind + the bind line
+qs -c end4-pC ipc call plugins commands     # every IPC target plugins own
+qs -c end4-pC ipc call plugins list         # what is installed, and on or off
+qs -c end4-pC ipc call plugins toggle dock
+```
+
+`plugins/battery` is the worked example: `BatteryIpc.qml` plus a `shortcuts` entry that
+calls it.
 
 ### settings
 

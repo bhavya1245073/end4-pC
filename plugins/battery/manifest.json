@@ -25,6 +25,22 @@
         "entry": "BatteryDesktopWidget.qml",
         "enabledByDefault": true
       }
+    ],
+    "ipc": [
+      {
+        "entry": "BatteryIpc.qml"
+      }
+    ],
+    "shortcuts": [
+      {
+        "id": "batteryReport",
+        "description": "Print battery status to the log",
+        "suggestedKey": "SUPER SHIFT, B",
+        "ipc": {
+          "target": "battery",
+          "function": "report"
+        }
+      }
     ]
   },
   "settings": [

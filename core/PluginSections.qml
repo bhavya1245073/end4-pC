@@ -12,13 +12,28 @@
 // which is the whole point: a hardcoded settings section for a plugin that is not
 // loaded is a row of controls wired to nothing.
 //
-// Each entry is a ContentSection (or anything that sizes itself), loaded lazily.
-//
 // The model is every *installed* section, not the active ones: a Repeater over a
 // reassigned JS array rebuilds all of its delegates, so an active-derived model made
-// toggling one plugin rebuild every section on the page. The enabled state is on the
-// Loader's `active` instead, which both collapses the section to nothing and costs a
-// boolean.
+// toggling one plugin rebuild every section on the page.
+//
+// ## Loaded once, then only shown or hidden
+//
+// The obvious way to make a section disappear is to unload it - `active:
+// isLoaded(pluginId)` - and that is what this did. It is also the single most expensive
+// thing that happened when a plugin was toggled: measured in the real settings window,
+// toggling a plugin that owns a section blocked the UI thread for 390ms and spent 48% of
+// a five-second window blocked, while a plugin with no section cost 13ms. That is the
+// difference the user could feel between one plugin and another, and it had nothing to do
+// with the plugin.
+//
+// A settings section is a few dozen controls. Building them is not free, throwing them
+// away and rebuilding them on a switch flip is waste, and `asynchronous: true` does not
+// help nearly as much as it sounds - the incubator still does the work on this thread.
+//
+// So a section is built the first time its plugin is on, and after that toggling only
+// changes `visible`. Qt Quick Layouts exclude invisible items, so a hidden section
+// collapses exactly as if it were gone. The controls of a switched-off plugin are inert
+// either way: they write to that plugin's stored settings, which is where they belong.
 
 import QtQuick
 import QtQuick.Layouts
@@ -37,25 +52,31 @@ ColumnLayout {
         model: PluginRegistry.sectionsFor(root.page)
 
         delegate: Loader {
+            id: section
+
             required property var modelData
+
+            // Sticky: once built, it stays built. Flipping this back to false is what
+            // used to cost 390ms every time the user touched a switch.
+            property bool everLoaded: false
 
             Layout.fillWidth: true
 
-            // Unloaded, not merely hidden, when the plugin is off: the controls would
-            // be wired to a plugin that is not running.
-            //
-            // `isLoaded`, not `isActive`, and asynchronous: this section is on the very
-            // page the user just clicked the switch on, so loading it synchronously in
-            // the same turn is what made the switch appear to stick.
-            active: PluginRegistry.isLoaded(modelData.pluginId)
+            // `isLoaded`, not `isActive`: this section is on the very page the user just
+            // clicked the switch on, so building it in the same turn as the click means
+            // the frame acknowledging the click never gets painted.
+            active: section.everLoaded || PluginRegistry.isLoaded(section.modelData.pluginId)
             asynchronous: true
+            source: section.modelData.url ?? ""
 
-            // A section whose file is missing should not take the page down with it.
-            source: active ? (modelData.url ?? "") : ""
+            // `isActive`, not `isLoaded`: hiding should track the click immediately.
+            visible: PluginRegistry.isActive(section.modelData.pluginId)
+
+            onLoaded: section.everLoaded = true
 
             onStatusChanged: {
-                if (status === Loader.Error)
-                    console.warn(`[plugins] ${modelData.pluginId}: settings section ${modelData.entry} failed to load`);
+                if (section.status === Loader.Error)
+                    console.warn(`[plugins] ${section.modelData.pluginId}: settings section ${section.modelData.entry} failed to load`);
             }
         }
     }
