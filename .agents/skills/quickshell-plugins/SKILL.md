@@ -432,6 +432,9 @@ Invariants, each of which took a bug to learn:
   loaded — Quickshell documents this. Use `activeAsync` for anything that is not
   needed this frame. (`Variants` has no async support, so a panel using it still
   blocks while it loads.)
+- **Never enumerate built-ins in a host.** Bar widgets, desktop widgets and quick
+  toggles are rows in `BarWidgetRegistry`, `DesktopWidgetRegistry` and
+  `QuickToggleRegistry`. Adding one in a second place is how those lists drifted.
 - **`Config.options.*` is a `JsonAdapter`** and drops keys it does not declare —
   which is why plugin settings live in `plugins.json` instead.
 - **A `MouseArea` in a layout is wrong.** It is an `Item`, so the layout gives it

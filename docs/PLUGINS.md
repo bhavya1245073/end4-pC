@@ -87,6 +87,8 @@ Every `entry` is a path relative to the plugin folder.
                           "page": "Interface", "order": 30 } ],
     "launcherActions":[ { "id": "hello", "exec": ["notify-send", "hi"] },
                         { "id": "backup", "script": "scripts/backup.sh" } ],
+    "quickToggles":   [ { "id": "myToggle", "entry": "MyToggle.qml",
+                          "menu": "", "requires": "" } ],
     "shortcuts":      [ { "id": "toggleMyPanel", "description": "Toggle my panel",
                           "suggestedKey": "SUPER, M",
                           "ipc": { "target": "myPanel", "function": "toggle" } } ]
@@ -98,15 +100,31 @@ Every `entry` is a path relative to the plugin folder.
 | `panels` | A window. Loaded once at shell scope while the plugin is on. Root type: `PanelWindow` (or a `Scope` holding several). |
 | `services` | A non-visual object: timers, file watchers, `Process`, `IpcHandler`. Loaded once at shell scope. Root type: `Scope` or any `QtObject`. |
 | `barWidgets` | Selectable in **Settings → Bar** and placeable in any of the three bar sections. `pillColor` is one of `primary`, `secondary`, `tertiary`, `primaryContainer`, `secondaryContainer`, `tertiaryContainer`, `layer0`, `layer1`. `materialPill: false` opts out of the pill in the Material bar style. `multipleAllowed: true` lets the widget be added more than once. |
-| `desktopWidgets` | Draggable widget on the wallpaper. Toggle in **Settings → Desktop → Widgets → From plugins**. |
+| `desktopWidgets` | Draggable widget on the wallpaper. Appears in the desktop right-click menu under **Widgets**, and in **Settings → Desktop**, alongside the built-in ones - there is no separate "from plugins" area, because built-ins and plugin widgets come from the same registry. Root type: `PluginBackgroundWidget`. |
 | `settingsPages` | A whole page in the settings sidebar, for when the generated form isn't enough. `order` sorts them (default 100). Keeps its nav entry while the plugin is off, greyed out. |
 | `settingsSections` | A section injected into an **existing** settings page, named by `page`. Unlike a page, it *disappears* when the plugin is switched off - which is why every stock panel's settings live in the plugin rather than in the core page. |
 | `launcherActions` | `>`-prefixed launcher action. Either `exec` (argv array) or `script` (path inside the plugin). Anything typed after the action name is appended as arguments. |
+| `quickToggles` | A tile in the sidebar's quick settings panel. Inherit `AndroidQuickToggleButton` and it works in both panel styles; supply `classicEntry` if you want a different file for the classic style. `menu` names a dialog its expand arrow opens (`wifi`, `bluetooth`, `nightLight`, `audioOutput`, `audioInput`); `requires` limits it to one compositor. Appears in the unused-toggle tray, draggable into the grid like any built-in. |
 | `shortcuts` | A keybind, registered as `quickshell:<id>`. Give it `exec` (argv array) or `ipc` (`{ target, function }`) and the shell handles it with no QML from you. `suggestedKey` is documentation, shown in the plugin's page under **Keybinds**; nothing binds a key for you. Omit both `exec` and `ipc` to declare a shortcut you handle yourself with `CompositorGlobalShortcut`. |
 
-Ids must be unique across plugins for the same kind. A `barWidgets` entry that
-reuses a built-in id (`clockWidget`, `media`, ...) **replaces** the built-in - that
-is the supported way to swap out a stock widget.
+Ids must be unique across plugins for the same kind. A `barWidgets`,
+`desktopWidgets` or `quickToggles` entry that reuses a built-in id (`clockWidget`,
+`media`, `network`, ...) **replaces** the built-in - that is the supported way to
+swap out a stock widget.
+
+### Where built-ins live
+
+Built-ins are rows in the same tables plugin contributions land in, so anything the
+shell ships can be replaced, and anything a plugin adds is a first-class citizen:
+
+| Registry | Table of |
+| --- | --- |
+| `core/BarWidgetRegistry.qml` | bar widgets: file, name, icon, pill preference, pill colour, repeatability |
+| `core/DesktopWidgetRegistry.qml` | desktop widgets: file, name, icon, and where the enabled flag is stored |
+| `core/QuickToggleRegistry.qml` | quick toggles: file per panel style, dialog, required compositor |
+
+None of these are consulted by more than one host. If you find yourself adding a
+widget in two places, one of them is wrong.
 
 ### settings
 

@@ -432,3 +432,57 @@ Scope {
 
 Anything that writes user state (`PluginRegistry.setEnabled`, `Config.options.*`)
 writes to the real config. Back it up and restore it, or do not call it.
+
+---
+
+## Built-in registries
+
+Built-ins are rows in the same tables plugin contributions land in. A host reads one
+list and cannot tell the difference.
+
+| Singleton | Holds |
+| --- | --- |
+| `BarWidgetRegistry` | `all`, `find`, `url`, `name`, `repeatable`, `wantsPill`, `pillColor` |
+| `DesktopWidgetRegistry` | `all`, `find`, `available`, `installed`, `enabled`, `setEnabled`, `toggle` |
+| `QuickToggleRegistry` | `all`, `availableFor(style)`, `availableIds(style)`, `find`, `androidUrl`, `classicUrl`, `menuFor` |
+
+`available()` uses `isLoaded` (gating instantiation); `installed()` uses `isActive`
+(gating a GUI switch, which should track the click immediately).
+
+## Two rules for anything loaded by URL
+
+Both of these produce a component that compiles but will not load, and neither shows
+up in phase 1.
+
+**No `required` properties.** A component with an uninitialised required property
+cannot be constructed, so a `Loader` reports `Loader.Error` and you get nothing. Give
+the property a default and let the host bind over it. `required` is fine for a type
+always instantiated by hand, and fatal for one resolved from an id.
+
+**Read context from the parent, do not make the host push it.** Both
+`AbstractBackgroundWidget` and `PluginBackgroundWidget` take their screen geometry
+from the canvas they sit on. That is why a desktop widget entry is just a URL.
+
+## Do not gate a Loader on its own source
+
+```qml
+// wrong: `active` reads `source`, so the Loader never reads `source` itself,
+// the binding never evaluates, and nothing ever loads. Qt reports a binding loop.
+Loader {
+    source: SomeRegistry.url(id)
+    active: source != ""
+}
+
+// right: an empty source loads nothing on its own
+Loader {
+    source: SomeRegistry.url(id)
+    visible: status === Loader.Ready
+}
+```
+
+## Annotate function return types
+
+```qml
+function find(id: string): var { ... }   // right
+function find(id: string) { ... }        // logs "insufficiently annotated" per call
+```
