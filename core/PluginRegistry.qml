@@ -61,6 +61,21 @@ Singleton {
     readonly property var launcherActions: root.collect("launcherActions")
     readonly property var shortcuts: root.collect("shortcuts")
 
+    // Sections a plugin injects into an existing settings page, rather than a whole
+    // page of its own. This is what lets a plugin's settings live next to the related
+    // built-in ones and, crucially, disappear when the plugin is switched off - a
+    // hardcoded section for a plugin that is not running is a dead control.
+    readonly property var settingsSections: root.collect("settingsSections")
+
+    // Sections for one host page, in declared order. `page` matches the `page` field
+    // in the manifest, case-insensitively.
+    function sectionsFor(page: string): var {
+        const wanted = page.toLowerCase();
+        return root.settingsSections
+            .filter(section => (section.page ?? "").toLowerCase() === wanted)
+            .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
+    }
+
     readonly property var settingsPages: root.collect("settingsPages")
         .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
 

@@ -1,18 +1,26 @@
 {
-    "id": "wallpaper-selector",
-    "name": "Wallpaper Selector",
-    "version": "1.0.0",
-    "apiVersion": 1,
-    "description": "Wallpaper browser that drives the Material You palette.",
-    "author": "illogical-impulse",
-    "icon": "wallpaper",
-    "enabledByDefault": true,
-    "provides": {
-        "panels": [
-            {
-                "id": "wallpaperSelector",
-                "entry": "WallpaperSelector.qml"
-            }
-        ]
-    }
+  "id": "wallpaper-selector",
+  "name": "Wallpaper Selector",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Wallpaper browser that drives the Material You palette.",
+  "author": "illogical-impulse",
+  "icon": "wallpaper",
+  "enabledByDefault": true,
+  "provides": {
+    "panels": [
+      {
+        "id": "wallpaperSelector",
+        "entry": "WallpaperSelector.qml"
+      }
+    ],
+    "settingsSections": [
+      {
+        "id": "wallpaperSelector",
+        "page": "Interface",
+        "entry": "WallpaperSelectorSettings.qml",
+        "order": 80
+      }
+    ]
+  }
 }

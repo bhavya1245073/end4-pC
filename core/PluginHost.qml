@@ -36,4 +36,15 @@ Scope {
             active: Config.ready
         }
     }
+
+    // Keybinds declared in manifests. The registry was already collecting these and
+    // nothing was acting on them, so a plugin could declare a shortcut that silently
+    // did nothing.
+    Instantiator {
+        model: PluginRegistry.shortcuts
+        delegate: PluginShortcut {
+            required property var modelData
+            descriptor: modelData
+        }
+    }
 }

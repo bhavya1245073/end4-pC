@@ -25,6 +25,11 @@ ContentPage {
 
     readonly property var openManifest: page.openPlugin === "" ? null : PluginRegistry.get(page.openPlugin)
 
+    readonly property var pluginShortcuts: {
+        const declared = page.openManifest?.provides?.shortcuts;
+        return Array.isArray(declared) ? declared : [];
+    }
+
     property string filter: ""
 
     readonly property var visiblePlugins: {
@@ -370,6 +375,41 @@ ContentPage {
 
                 Behavior on opacity {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
+            }
+
+            // Keybinds the plugin declares. Nothing binds a key for you, so listing
+            // them is the difference between a usable shortcut and one the user has no
+            // way of discovering.
+            ContentSection {
+                icon: "keyboard"
+                shape: MaterialShape.Shape.Cookie7Sided
+                title: Translation.tr("Keybinds")
+                visible: page.pluginShortcuts.length > 0
+
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    text: Translation.tr("Bind these in your compositor config. Under Hyprland: bind = SUPER, K, global, quickshell:<name>")
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    wrapMode: Text.Wrap
+                }
+
+                Repeater {
+                    model: page.pluginShortcuts
+
+                    delegate: PluginRow {
+                        required property var modelData
+
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8
+
+                        icon: "keyboard_command_key"
+                        label: modelData.description ?? modelData.id ?? modelData.name ?? ""
+                        value: `quickshell:${modelData.id ?? modelData.name ?? ""}`
+                    }
                 }
             }
 

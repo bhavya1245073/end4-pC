@@ -1,18 +1,26 @@
 {
-    "id": "screen-corners",
-    "name": "Screen Corners",
-    "version": "1.0.0",
-    "apiVersion": 1,
-    "description": "Rounded corner overlays on every screen.",
-    "author": "illogical-impulse",
-    "icon": "rounded_corner",
-    "enabledByDefault": true,
-    "provides": {
-        "panels": [
-            {
-                "id": "screenCorners",
-                "entry": "ScreenCorners.qml"
-            }
-        ]
-    }
+  "id": "screen-corners",
+  "name": "Screen Corners",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Rounded corner overlays on every screen.",
+  "author": "illogical-impulse",
+  "icon": "rounded_corner",
+  "enabledByDefault": true,
+  "provides": {
+    "panels": [
+      {
+        "id": "screenCorners",
+        "entry": "ScreenCorners.qml"
+      }
+    ],
+    "settingsSections": [
+      {
+        "id": "hotCorners",
+        "page": "Interface",
+        "entry": "HotCornerSettings.qml",
+        "order": 70
+      }
+    ]
+  }
 }

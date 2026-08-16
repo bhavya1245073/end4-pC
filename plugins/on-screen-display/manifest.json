@@ -1,18 +1,26 @@
 {
-    "id": "on-screen-display",
-    "name": "On-Screen Display",
-    "version": "1.0.0",
-    "apiVersion": 1,
-    "description": "Volume, brightness and gamma indicators that appear on change.",
-    "author": "illogical-impulse",
-    "icon": "tune",
-    "enabledByDefault": true,
-    "provides": {
-        "panels": [
-            {
-                "id": "onScreenDisplay",
-                "entry": "OnScreenDisplay.qml"
-            }
-        ]
-    }
+  "id": "on-screen-display",
+  "name": "On-Screen Display",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Volume, brightness and gamma indicators that appear on change.",
+  "author": "illogical-impulse",
+  "icon": "tune",
+  "enabledByDefault": true,
+  "provides": {
+    "panels": [
+      {
+        "id": "onScreenDisplay",
+        "entry": "OnScreenDisplay.qml"
+      }
+    ],
+    "settingsSections": [
+      {
+        "id": "osd",
+        "page": "Interface",
+        "entry": "OsdSettings.qml",
+        "order": 60
+      }
+    ]
+  }
 }

@@ -1,18 +1,26 @@
 {
-    "id": "lock",
-    "name": "Lock Screen",
-    "version": "1.0.0",
-    "apiVersion": 1,
-    "description": "Lock screen with clock, media, notifications and authentication.",
-    "author": "illogical-impulse",
-    "icon": "lock",
-    "enabledByDefault": true,
-    "provides": {
-        "panels": [
-            {
-                "id": "lock",
-                "entry": "Lock.qml"
-            }
-        ]
-    }
+  "id": "lock",
+  "name": "Lock Screen",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Lock screen with clock, media, notifications and authentication.",
+  "author": "illogical-impulse",
+  "icon": "lock",
+  "enabledByDefault": true,
+  "provides": {
+    "panels": [
+      {
+        "id": "lock",
+        "entry": "Lock.qml"
+      }
+    ],
+    "settingsSections": [
+      {
+        "id": "lock",
+        "page": "Interface",
+        "entry": "LockSettings.qml",
+        "order": 30
+      }
+    ]
+  }
 }
