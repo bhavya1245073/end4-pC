@@ -5,21 +5,22 @@
 # Nothing is instantiated, so no windows appear and the running shell is not
 # touched. Needs a Wayland session (Quickshell won't start without one).
 #
-#   scripts/check-qml.sh                  # whole tree
+#   scripts/check-qml.sh                  # whole tree, then the plugin entry points
 #   scripts/check-qml.sh plugins          # one or more subtrees
 #
-# Exit status is 0 only when every file compiled, so this is usable in a hook.
+# Exit status is 0 only when everything passed, so this is usable in a hook.
 #
-# ## Two things make this work, and both used to be wrong
+# ## Three things make this work, and all three used to be wrong
 #
 # 1. **The harness has to import what the tree imports.** A synthetic `qs.*`
-#    module only exists once something has imported it, and an import inside a
-#    dynamically created component is too late. The real shell registers the deep
-#    ones (`qs.modules.ii.bar`, `qs.modules.common.widgets.widgetCanvas`, ...) on
-#    the way down from shell.qml, so this harness is generated with a static
-#    `import` for every `qs.*` module the tree mentions. Without them a pristine
-#    tree reported 76 "module is not installed" failures that the running shell
-#    does not have.
+#    module only exists once something has *statically* imported it, and an import
+#    inside a dynamically created component is too late. So this harness is
+#    generated with a static `import` for every `qs.*` module the tree mentions.
+#    Without them a pristine tree reported 76 "module is not installed" failures.
+#
+#    The shell itself has the same problem, which is what `core/PluginModuleAnchors.qml`
+#    is for. Do not let this harness paper over a missing anchor: phase 2 below is
+#    the check that would catch one.
 #
 # 2. **`file://` URLs, deliberately.** That is what `core/PluginRegistry.qml`
 #    resolves plugin entries to, so compiling the same way tests the path a
@@ -27,6 +28,20 @@
 #    virtual `qs:` filesystem; compiling from there works too, but it registers
 #    each directory as a module, and plugin folders cannot be modules because
 #    their names contain hyphens.)
+#
+# 3. **Compiling every file individually is not enough, and can lie.** The engine
+#    caches compiled types by name, so compiling an internal file the shell never
+#    loads directly can bind a name early and hide a genuine clash. That is not
+#    hypothetical: `plugins/overlay/notes/Notes.qml` clashed with the `Notes`
+#    singleton in `qs.services`, the whole overlay plugin failed to load in the
+#    real shell, and phase 1 reported failures=0 because it had already compiled
+#    `Notes.qml` on its own.
+#
+#    So phase 2 compiles only what the shell actually loads — each plugin's
+#    declared manifest entries — which is a closer reproduction but still shares one
+#    engine, so treat it as best-effort. Phase 3 is the deterministic one: it looks
+#    for the name clashes that make the other two order-dependent at all, and it is
+#    what catches the `Notes` class of bug reliably.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -155,6 +170,147 @@ if ! grep -q '^QMLCHECK DONE ' <<<"$summary"; then
     sed 's/\x1b\[[0-9;]*m//g' "$log" | tail -30 >&2
     status=1
 elif ! grep -q 'failures=0$' <<<"$summary"; then
+    status=1
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 2: the plugin entry points, the way the shell loads them.
+#
+# Only the entries each manifest declares, with only the imports shell.qml really
+# has, so a module the core forgot to anchor shows up here rather than at runtime.
+# Still one engine for all of them, so this does not fully escape the cache
+# ordering described above - phase 3 is the deterministic check.
+# Skipped when a subtree was named, since then the run is deliberately partial.
+# ---------------------------------------------------------------------------
+
+if [[ "$*" == "." ]] && command -v jq >/dev/null 2>&1; then
+    entries=""
+    for manifest in "$ROOT"/plugins/*/manifest.json; do
+        [[ -e "$manifest" ]] || continue
+        dir="$(dirname "$manifest")"
+        while read -r entry; do
+            [[ -n "$entry" && "$entry" != "null" ]] || continue
+            entries+="file://$dir/$entry,"
+        done < <(jq -r '(.provides // {}) | to_entries[] | .value[]? | .entry // empty' "$manifest")
+    done
+
+    entryHarness="$ROOT/.qml-check-entries.qml"
+    entryLog="$(mktemp -t qml-entries.XXXXXX)"
+    trap 'rm -f "$HARNESS" "$log" "$entryHarness" "$entryLog"' EXIT
+
+    # Only the imports shell.qml really has. Anything a plugin needs must come
+    # from core/PluginModuleAnchors.qml, which is the point of the exercise.
+    cat >"$entryHarness" <<'QML'
+import QtQuick
+import Quickshell
+import qs.core
+
+ShellRoot {
+    PluginModuleAnchors {}
+
+    Component.onCompleted: {
+        const targets = (Quickshell.env("QMLCHECK_TARGETS") ?? "").split(",").filter(t => t.length > 0);
+        let failed = 0;
+        for (const t of targets) {
+            const c = Qt.createComponent(t, Component.PreferSynchronous);
+            if (c.status === Component.Error) {
+                failed++;
+                console.log("QMLCHECK FAIL " + t);
+                console.log(c.errorString());
+            }
+        }
+        console.log("QMLCHECK DONE checked=" + targets.length + " failures=" + failed);
+    }
+}
+QML
+
+    entryCount=$(( $(tr -cd ',' <<<"$entries" | wc -c) ))
+    echo "==> Loading $entryCount plugin entry point(s) the way the shell does..."
+
+    QMLCHECK_TARGETS="$entries" qs -p "$entryHarness" >"$entryLog" 2>&1 &
+    entry_pid=$!
+
+    deadline=$(( $(date +%s) + 300 ))
+    while :; do
+        grep -q 'QMLCHECK DONE ' "$entryLog" 2>/dev/null && break
+        kill -0 "$entry_pid" 2>/dev/null || break
+        (( $(date +%s) < deadline )) || { echo "check-qml.sh: entry phase timed out" >&2; break; }
+        sleep 0.1
+    done
+
+    kill "$entry_pid" 2>/dev/null || true
+    wait "$entry_pid" 2>/dev/null || true
+
+    entrySummary="$(
+        sed 's/\x1b\[[0-9;]*m//g' "$entryLog" \
+            | sed -n 's/^ *DEBUG qml: //p' \
+            | sed "s|file://$ROOT/||g" \
+            | awk '
+                /^QMLCHECK FAIL / { print "FAIL " $3; inside = 1; next }
+                /^QMLCHECK DONE / { print; inside = 0; next }
+                inside && length($0) { print "      " $0 }
+            '
+    )"
+
+    [[ -n "$entrySummary" ]] && echo "$entrySummary"
+
+    if ! grep -q '^QMLCHECK DONE ' <<<"$entrySummary"; then
+        echo "check-qml.sh: the entry harness did not run to completion; full log:" >&2
+        sed 's/\x1b\[[0-9;]*m//g' "$entryLog" | tail -30 >&2
+        status=1
+    elif ! grep -q 'failures=0$' <<<"$entrySummary"; then
+        status=1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Phase 3: type names that also name a singleton.
+#
+# Two types with one name, one of them a singleton, resolve to whichever the
+# engine bound first. The loser fails with "qmldir defines type as singleton, but
+# no pragma Singleton found", and which one loses depends on load order, so it can
+# work for months and then not.
+#
+# Only a clash whose plain type is instantiated *by name* can actually bite — a
+# file loaded by URL never has its name resolved, which is why the two
+# `pages/*Config.qml` that shadow service singletons are harmless. Those are
+# reported as notes; a name that is really used is an error.
+# ---------------------------------------------------------------------------
+
+mapfile -t singletonFiles < <(grep -rl '^pragma Singleton' --include='*.qml' . | sort)
+
+singletonNames=""
+for f in "${singletonFiles[@]}"; do
+    singletonNames+="$(basename "$f" .qml)"$'\n'
+done
+
+clashes=0
+notes=0
+
+while read -r file; do
+    [[ -n "$file" ]] || continue
+    grep -q '^pragma Singleton' "$file" && continue
+
+    name="$(basename "$file" .qml)"
+    grep -qxF "$name" <<<"$singletonNames" || continue
+
+    owner="$(printf '%s\n' "${singletonFiles[@]}" | grep -E "/$name\.qml$" | head -1)"
+
+    # Used as a type anywhere? `Name {` is how QML instantiates one.
+    if grep -rqE "(^|[^A-Za-z0-9_.])$name[[:space:]]*\{" --include='*.qml' .; then
+        (( clashes == 0 )) && echo "==> Type names that also name a singleton:"
+        clashes=$(( clashes + 1 ))
+        echo "    CLASH $name is instantiated by name, and both of these define it:"
+        echo "          singleton  ${owner#./}"
+        echo "          plain type ${file#./}"
+    else
+        (( notes == 0 )) && echo "==> Shadowed singleton names (loaded by URL only, so harmless):"
+        notes=$(( notes + 1 ))
+        echo "    NOTE  $name  ${file#./}  shadows  ${owner#./}"
+    fi
+done < <(find . -name '*.qml' -not -path './.git/*' | sort)
+
+if (( clashes )); then
     status=1
 fi
 

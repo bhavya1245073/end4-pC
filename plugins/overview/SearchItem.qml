@@ -192,6 +192,8 @@ RippleButton {
                 text: root.itemType
             }
             RowLayout {
+                id: nameRow
+
                 Loader { // Checkmark for copied clipboard entry
                     visible: itemName == Quickshell.clipboardText && root.cliphistRawString
                     active: itemName == Quickshell.clipboardText && root.cliphistRawString
@@ -213,7 +215,10 @@ RippleButton {
                     model: root.query == root.itemName ? [] : root.urls
                     Favicon {
                         required property var modelData
-                        size: parent.height
+                        // Not `parent.height`: a Repeater delegate evaluates its
+                        // bindings before it is parented, so parent is briefly
+                        // null and this threw on every keystroke.
+                        size: nameRow.height
                         url: modelData
                     }
                 }

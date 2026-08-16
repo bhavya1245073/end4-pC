@@ -1,5 +1,4 @@
 pragma ComponentBehavior: Bound
-import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
@@ -23,6 +22,6 @@ DelegateChooser {
     DelegateChoice { roleValue: "fpsLimiter"; FpsLimiter {} }
     DelegateChoice { roleValue: "recorder"; Recorder {} }
     DelegateChoice { roleValue: "resources"; Resources {} }
-    DelegateChoice { roleValue: "notes"; Notes {} }
+    DelegateChoice { roleValue: "notes"; NotesWidget {} }
     DelegateChoice { roleValue: "volumeMixer"; VolumeMixer {} }
 }

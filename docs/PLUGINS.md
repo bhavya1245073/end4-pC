@@ -101,7 +101,7 @@ is the supported way to swap out a stock widget.
 
 ### settings
 
-An ordered array. Each entry becomes one row in the plugin's card under
+An ordered array. Each entry becomes one row on the plugin's page under
 **Settings → Plugins**, in this order.
 
 ```json
@@ -112,7 +112,8 @@ An ordered array. Each entry becomes one row in the plugin's card under
     "label": "Time format",
     "description": "Shown in small text under the control.",
     "icon": "schedule",
-    "placeholder": "hh:mm ap"
+    "placeholder": "hh:mm ap",
+    "group": "Appearance"
 }
 ```
 
@@ -127,6 +128,11 @@ An ordered array. Each entry becomes one row in the plugin's card under
 `key`, `type` and `label` are what matter; everything else is optional. Values are
 validated against the schema on read, so a hand-edited `plugins.json` can't feed
 your plugin a string where it expects a number.
+
+`group` puts the row under a subheading, with the rows that share it. Groups appear
+in the order they first occur, and rows without one come first — so a handful of
+settings need no groups at all, and twenty are not a wall. Keep `description` to one
+line: it sits under the control, and a three-line one makes the list ragged.
 
 ## Several files, subfolders and singletons
 
@@ -292,6 +298,37 @@ The stock panels under `plugins/` are the one exception: they ship with the
 shell, so `plugins/lock` and `plugins/overlay` do reach into `qs.modules.ii.bar`
 and `qs.modules.ii.sidebarRight` for a component each. They get to break with
 those modules; your plugin doesn't have to.
+
+### Importing a module nothing else imports
+
+If you import a `qs.*` module that no core file already imports, add it to
+`core/PluginModuleAnchors.qml` as well.
+
+A `qs.foo` module only exists once the engine has *compiled* an `import qs.foo`
+statement. Everything reachable by static imports from `shell.qml` is compiled
+before anything runs, so those modules are all registered in time. Plugins are
+found on disk at runtime and loaded from a URL, so their imports are compiled far
+too late to register anything, and a module only a plugin imports is never
+registered at all:
+
+```
+module "qs.modules.common.panels.lock" is not installed
+```
+
+That is a whole plugin failing to load, silently, with only a line in the log.
+`PluginModuleAnchors` is in the static graph and exists purely to import those
+modules; adding a duplicate is harmless. `scripts/check-qml.sh` phase 2 loads every
+plugin entry point with only the imports the shell really has, so a forgotten
+anchor fails the check instead of shipping.
+
+### Don't name a type after a singleton
+
+Two types with the same name, one of them a singleton, resolve to whichever the
+engine bound to the name first. The loser fails with `qmldir defines type as
+singleton, but no pragma Singleton found`, and which one loses depends on load
+order - so it can work for months and then not. `plugins/overlay`'s notes widget is
+called `NotesWidget` and not `Notes` for exactly this reason: `qs.services` already
+exports a `Notes` singleton. `check-qml.sh` phase 3 checks this.
 
 ## Enable state and the config file
 

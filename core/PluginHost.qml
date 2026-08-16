@@ -12,6 +12,10 @@ import qs.modules.common
 Scope {
     id: root
 
+    // Registers the qs.* modules plugin code imports. Must be instantiated, not
+    // just present on disk, or its imports are never compiled. See the file.
+    PluginModuleAnchors {}
+
     // Non-visual, always-on objects (timers, watchers, IPC handlers).
     Instantiator {
         model: PluginRegistry.services
