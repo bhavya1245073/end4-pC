@@ -198,12 +198,14 @@ while IFS=$'\t' read -r sid has_ipc has_exec; do
         && report error "manifest.json" "shortcut \"$sid\" has neither ipc nor exec, so pressing it does nothing"
 done < <(jq -r '(.provides.shortcuts // [])[] | [.id, (.ipc != null), (.exec != null)] | @tsv' "$MANIFEST")
 
-# A context menu item likewise.
-while IFS=$'\t' read -r cid has_ipc has_exec has_entry; do
+# A context menu item likewise. Five verbs now: panel opens a panel, ipc calls a command, exec runs
+# argv, url opens a link, entry names a submenu. A row with none of them draws and does nothing.
+while IFS=$'\t' read -r cid has_ipc has_exec has_entry has_panel has_url; do
     [[ -z "$cid" ]] && continue
-    [[ "$has_ipc" == "false" && "$has_exec" == "false" && "$has_entry" == "false" ]] \
-        && report error "manifest.json" "context menu item \"$cid\" has no ipc, exec or entry, so clicking it does nothing"
-done < <(jq -r '(.provides.contextMenuItems // [])[] | [.id, (.ipc != null), (.exec != null), (.entry != null)] | @tsv' "$MANIFEST")
+    [[ "$has_ipc" == "false" && "$has_exec" == "false" && "$has_entry" == "false" \
+       && "$has_panel" == "false" && "$has_url" == "false" ]] \
+        && report error "manifest.json" "context menu item \"$cid\" has no panel, ipc, exec, url or entry, so clicking it does nothing"
+done < <(jq -r '(.provides.contextMenuItems // [])[] | [.id, (.ipc != null), (.exec != null), (.entry != null), (.panel != null), (.url != null)] | @tsv' "$MANIFEST")
 
 # An ipc reference that names a target no manifest declares. Checked across this
 # plugin only: a cross-plugin reference is legal, just unverifiable from here.
