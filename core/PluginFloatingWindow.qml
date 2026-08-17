@@ -35,9 +35,10 @@ Item {
     id: root
 
     // Identity. `pluginId` is what plugins.json is keyed on, `windowId` distinguishes several
-    // windows belonging to one plugin.
+    // windows belonging to one plugin. `panelId` is the PanelRegistry id (defaults to pluginId).
     property string pluginId: ""
     property string windowId: "window"
+    property string panelId: root.pluginId
 
     // Chrome.
     property string title: ""
@@ -49,7 +50,15 @@ Item {
     // single item; PluginIconButton is the intended content.
     property Component actions: null
 
-    property bool open: false
+    property bool open: (root.panelId && PanelRegistry.state(root.panelId)) ? PanelRegistry.state(root.panelId).open : false
+
+    Connections {
+        target: (root.panelId && PanelRegistry.state(root.panelId)) ? PanelRegistry.state(root.panelId) : null
+        function onOpenChanged(): void {
+            if (root.panelId && PanelRegistry.state(root.panelId))
+                root.open = PanelRegistry.state(root.panelId).open;
+        }
+    }
 
     // Behaviour.
     property bool closeOnEscape: true
@@ -87,9 +96,26 @@ Item {
     // property, so a plugin still just writes its content as a child.
     default property Component content: null
 
-    function show(): void { root.open = true; }
-    function hide(): void { root.open = false; }
-    function toggle(): void { root.open = !root.open; }
+    function show(): void {
+        if (root.panelId)
+            PanelRegistry.open(root.panelId);
+        else
+            root.open = true;
+    }
+
+    function hide(): void {
+        if (root.panelId)
+            PanelRegistry.close(root.panelId);
+        else
+            root.open = false;
+    }
+
+    function toggle(): void {
+        if (root.panelId)
+            PanelRegistry.toggle(root.panelId);
+        else
+            root.open = !root.open;
+    }
 
     // Puts the window back where `initialPosition` says, forgetting the stored position.
     function resetGeometry(): void {
@@ -245,7 +271,7 @@ Item {
                 border.width: 1
                 border.color: Theme.fade(Theme.outline, 0.25)
                 focus: true
-                Keys.onEscapePressed: if (root.closeOnEscape) root.open = false
+                Keys.onEscapePressed: if (root.closeOnEscape) root.hide()
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -312,7 +338,7 @@ Item {
                                 visible: root.showCloseButton
                                 icon: "close"
                                 tooltip: qsTr("Close")
-                                onClicked: root.open = false
+                                onClicked: root.hide()
                             }
                         }
 
