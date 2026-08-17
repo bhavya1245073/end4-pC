@@ -23,8 +23,6 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell:dropshelf"
     color: "transparent"
 
-    // Where it was dropped, from the open request. Defaults to the middle of the screen for an
-    // open with no arguments - `qs ipc call dropover show`, for instance.
     readonly property var openArgs: PanelRegistry.state("dropover").args
     property real posX: Math.max(20, (shelfRoot.openArgs.x ?? Screen.width / 2) - implicitWidth / 2)
     property real posY: Math.max(20, (shelfRoot.openArgs.y ?? Screen.height / 2) - implicitHeight - 30)
@@ -35,8 +33,16 @@ PanelWindow {
         top: shelfRoot.posY
     }
 
-    implicitWidth: 420
-    implicitHeight: shelfBg.implicitHeight
+    // Adaptive morphing width based on item count
+    readonly property real targetWidth: DropShelfState.items.length === 0 ? 360
+        : Math.min(Screen.width - 40, Math.max(380, DropShelfState.items.length * 128 + 48))
+
+    implicitWidth: shelfRoot.targetWidth
+    implicitHeight: shelfBg.implicitHeight + (Appearance.sizes.elevationMargin * 2)
+
+    Behavior on implicitWidth {
+        NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+    }
 
     // Re-anchor to drop location on open
     Connections {
@@ -62,28 +68,30 @@ PanelWindow {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        implicitHeight: contentColumn.implicitHeight + (Theme.pad.l * 2)
+        anchors.margins: Appearance.sizes.elevationMargin
+        implicitHeight: contentColumn.implicitHeight + (Theme.pad.m * 2)
 
-        radius: Theme.radius.l
-        color: Theme.solid
+        radius: Appearance.rounding.large
+        color: Appearance.colors.colSecondaryContainer
         border.width: dropZone.containsDrag ? 2 : 1
-        border.color: dropZone.containsDrag ? Theme.accent : Theme.fade(Theme.outline, 0.5)
+        border.color: dropZone.containsDrag ? Appearance.colors.colPrimary : Theme.fade(Theme.outline, 0.25)
+        clip: true
 
         Behavior on border.color {
-            animation: Theme.anim.fast.colorAnimation.createObject(this)
+            ColorAnimation { duration: 200 }
         }
 
-        // Single root DropArea for receiving files dragged into the shelf
+        // Root DropArea for receiving files dragged into the shelf
         DropArea {
             id: dropZone
             anchors.fill: parent
             keys: ["text/uri-list"]
 
-            onEntered: (drag) => {
+            onEntered: drag => {
                 drag.accepted = drag.hasUrls;
             }
 
-            onDropped: (drop) => {
+            onDropped: drop => {
                 if (!drop.hasUrls) {
                     drop.accepted = false;
                     return;
@@ -98,7 +106,7 @@ PanelWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.margins: Theme.pad.l
+            anchors.margins: Theme.pad.m
             spacing: Theme.pad.m
 
             // ── Draggable Header Bar ──────────────────────────────────────────
@@ -129,21 +137,21 @@ PanelWindow {
                 RowLayout {
                     id: headerRow
                     anchors.fill: parent
-                    spacing: Theme.pad.s
+                    spacing: 8
 
-                    // Grip / Move Icon
+                    // Move Icon Handle
                     MaterialSymbol {
                         text: "drag_indicator"
-                        iconSize: 18
-                        color: windowDragHandle.containsMouse ? Theme.accent : Theme.textDim
+                        iconSize: 20
+                        color: windowDragHandle.active ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
                     }
 
                     // Title
                     StyledText {
                         text: qsTr("Drop Shelf")
                         font.pixelSize: Theme.font.m
-                        font.weight: Font.DemiBold
-                        color: Theme.text
+                        font.weight: Font.Bold
+                        color: Appearance.colors.colOnSecondaryContainer
                     }
 
                     // Count Badge
@@ -151,82 +159,85 @@ PanelWindow {
                         visible: DropShelfState.items.length > 0
                         implicitHeight: 22
                         implicitWidth: countText.implicitWidth + 14
-                        radius: Theme.radius.full
-                        color: Theme.accentMuted
+                        radius: Appearance.rounding.full
+                        color: Appearance.colors.colPrimaryContainer
 
                         StyledText {
                             id: countText
                             anchors.centerIn: parent
                             text: `${DropShelfState.items.length}`
                             font.pixelSize: Theme.font.xs
-                            font.weight: Font.DemiBold
-                            color: Theme.onAccentMuted
+                            font.weight: Font.Bold
+                            color: Appearance.colors.colOnPrimaryContainer
                         }
                     }
 
                     Item { Layout.fillWidth: true }
 
-                    // Action Buttons
-                    RowLayout {
-                        spacing: Theme.pad.xs
+                    // Action Buttons Capsule
+                    Rectangle {
+                        implicitHeight: 32
+                        implicitWidth: actionRow.implicitWidth + 6
+                        radius: Appearance.rounding.full
+                        color: Appearance.colors.colLayer1
 
-                        // Copy Button
-                        Rectangle {
-                            visible: DropShelfState.items.length > 0
-                            implicitWidth: 28
-                            implicitHeight: 28
-                            radius: Theme.radius.full
-                            color: copyHov.containsPress ? Theme.fade(Theme.accent, 0.25)
-                                 : copyHov.containsMouse ? Theme.fade(Theme.accent, 0.12)
-                                 : "transparent"
+                        RowLayout {
+                            id: actionRow
+                            anchors.centerIn: parent
+                            spacing: 2
 
-                            MaterialSymbol {
-                                anchors.centerIn: parent
-                                text: "content_copy"
-                                iconSize: 15
-                                color: copyHov.containsMouse ? Theme.accent : Theme.textDim
+                            // Copy All
+                            Rectangle {
+                                visible: DropShelfState.items.length > 0
+                                implicitWidth: 28
+                                implicitHeight: 28
+                                radius: Appearance.rounding.full
+                                color: copyHov.containsMouse ? ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.15) : "transparent"
+
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "content_copy"
+                                    iconSize: 15
+                                    color: copyHov.containsMouse ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                }
+                                HoverHandler { id: copyHov }
+                                TapHandler { onTapped: DropShelfState.copyAll() }
                             }
-                            HoverHandler { id: copyHov }
-                            TapHandler { onTapped: DropShelfState.copyAll() }
-                        }
 
-                        // Clear Button
-                        Rectangle {
-                            visible: DropShelfState.items.length > 0
-                            implicitWidth: 28
-                            implicitHeight: 28
-                            radius: Theme.radius.full
-                            color: clearHov.containsPress ? Theme.fade(Theme.accent, 0.25)
-                                 : clearHov.containsMouse ? Theme.fade(Theme.accent, 0.12)
-                                 : "transparent"
+                            // Clear All
+                            Rectangle {
+                                visible: DropShelfState.items.length > 0
+                                implicitWidth: 28
+                                implicitHeight: 28
+                                radius: Appearance.rounding.full
+                                color: clearHov.containsMouse ? ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.15) : "transparent"
 
-                            MaterialSymbol {
-                                anchors.centerIn: parent
-                                text: "delete_sweep"
-                                iconSize: 16
-                                color: clearHov.containsMouse ? Theme.accent : Theme.textDim
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "delete_sweep"
+                                    iconSize: 16
+                                    color: clearHov.containsMouse ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                }
+                                HoverHandler { id: clearHov }
+                                TapHandler { onTapped: DropShelfState.clear() }
                             }
-                            HoverHandler { id: clearHov }
-                            TapHandler { onTapped: DropShelfState.clear() }
-                        }
 
-                        // Close Button
-                        Rectangle {
-                            implicitWidth: 28
-                            implicitHeight: 28
-                            radius: Theme.radius.full
-                            color: closeHov.containsPress ? Theme.fade(Theme.accent, 0.25)
-                                 : closeHov.containsMouse ? Theme.fade(Theme.accent, 0.12)
-                                 : "transparent"
+                            // Close Shelf
+                            Rectangle {
+                                implicitWidth: 28
+                                implicitHeight: 28
+                                radius: Appearance.rounding.full
+                                color: closeHov.containsMouse ? ColorUtils.applyAlpha(Appearance.colors.colPrimary, 0.15) : "transparent"
 
-                            MaterialSymbol {
-                                anchors.centerIn: parent
-                                text: "close"
-                                iconSize: 16
-                                color: closeHov.containsMouse ? Theme.accent : Theme.textDim
+                                MaterialSymbol {
+                                    anchors.centerIn: parent
+                                    text: "close"
+                                    iconSize: 16
+                                    color: closeHov.containsMouse ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                }
+                                HoverHandler { id: closeHov }
+                                TapHandler { onTapped: DropShelfState.hide() }
                             }
-                            HoverHandler { id: closeHov }
-                            TapHandler { onTapped: DropShelfState.hide() }
                         }
                     }
                 }
@@ -235,21 +246,21 @@ PanelWindow {
             // ── Parked Files Horizontal Shelf ─────────────────────────────────
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 120
+                Layout.preferredHeight: 124
                 visible: DropShelfState.items.length > 0
 
                 ListView {
                     id: fileListView
                     anchors.fill: parent
                     orientation: ListView.Horizontal
-                    spacing: 10
+                    spacing: 12
                     clip: true
                     model: DropShelfState.items
 
                     WheelHandler {
                         target: fileListView
                         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                        onWheel: (event) => {
+                        onWheel: event => {
                             if (event.angleDelta.y < 0 || event.angleDelta.x > 0)
                                 fileListView.flick(-400, 0);
                             else
@@ -262,26 +273,22 @@ PanelWindow {
                         required property string modelData
                         required property int index
 
-                        width: 110
-                        height: 120
+                        width: 114
+                        height: 124
                         path: modelData
 
-                        onClicked: {
-                            // Single click focuses / activates card without aggressively opening external app
-                        }
+                        scale: cardHover.containsMouse ? 1.03 : 1.0
+                        z: cardHover.containsMouse ? 10 : 1
+                        Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
 
                         Rectangle {
                             id: cardBg
                             anchors.fill: parent
-                            radius: Theme.radius.m
-                            color: cardHover.containsMouse ? Theme.top : Theme.raised
-                            border.width: 1
-                            border.color: cardDelegate.dragging ? Theme.accent : Theme.fade(Theme.outline, 0.4)
+                            radius: Appearance.rounding.medium
+                            color: Appearance.colors.colLayer1
+                            border.width: cardDelegate.dragging ? 2 : 1
+                            border.color: cardDelegate.dragging ? Appearance.colors.colPrimary : cardHover.containsMouse ? Appearance.colors.colPrimary : Theme.fade(Theme.outline, 0.25)
                             clip: true
-
-                            Behavior on color {
-                                animation: Theme.anim.fast.colorAnimation.createObject(this)
-                            }
 
                             // Image Thumbnail
                             StyledImage {
@@ -289,7 +296,7 @@ PanelWindow {
                                 anchors.top: parent.top
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                height: 80
+                                height: 82
                                 source: "file://" + cardDelegate.path
                                 fillMode: Image.PreserveAspectCrop
                                 cache: true
@@ -302,13 +309,13 @@ PanelWindow {
                                 anchors.top: parent.top
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                height: 80
+                                height: 82
 
                                 MaterialSymbol {
                                     anchors.centerIn: parent
                                     text: cardDelegate.path.endsWith("/") ? "folder" : "draft"
                                     iconSize: 36
-                                    color: Theme.accent
+                                    color: Appearance.colors.colPrimary
                                 }
                             }
 
@@ -317,43 +324,42 @@ PanelWindow {
                                 anchors.bottom: parent.bottom
                                 anchors.left: parent.left
                                 anchors.right: parent.right
-                                height: 40
-                                color: Theme.fade(Theme.solid, 0.85)
+                                height: 42
+                                color: Theme.fade(Appearance.colors.colLayer1, 0.95)
 
                                 StyledText {
                                     anchors.fill: parent
                                     anchors.margins: 4
                                     text: cardDelegate.path.split("/").filter(Boolean).pop() || "file"
                                     font.pixelSize: Theme.font.xs
+                                    font.weight: Font.Medium
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                     wrapMode: Text.WrapAnywhere
                                     maximumLineCount: 2
                                     elide: Text.ElideMiddle
-                                    color: Theme.text
+                                    color: Appearance.colors.colOnLayer1
                                 }
                             }
 
-                            // Remove Item Button (hover badge with isolated MouseArea)
+                            // Remove Item Button (Isolated Hover Badge)
                             Rectangle {
                                 id: removeBtn
                                 visible: cardHover.containsMouse
                                 anchors.top: parent.top
                                 anchors.right: parent.right
-                                anchors.margins: 4
-                                width: 22
-                                height: 22
-                                radius: 11
-                                color: removeMouse.containsPress ? Theme.error : (removeMouse.containsMouse ? Theme.accentBlock : Theme.solid)
-                                border.width: 1
-                                border.color: Theme.outlineDim
+                                anchors.margins: 5
+                                width: 24
+                                height: 24
+                                radius: 12
+                                color: removeMouse.containsPress ? Appearance.colors.colPrimary : Theme.fade("#000000", 0.65)
                                 z: 100
 
                                 MaterialSymbol {
                                     anchors.centerIn: parent
                                     text: "close"
-                                    iconSize: 12
-                                    color: removeMouse.containsPress ? "#ffffff" : (removeMouse.containsMouse ? Theme.error : Theme.textDim)
+                                    iconSize: 13
+                                    color: "#ffffff"
                                 }
 
                                 MouseArea {
@@ -383,27 +389,39 @@ PanelWindow {
             }
 
             // ── Empty State / Drop Hint ───────────────────────────────────────
-            Item {
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 100
+                implicitHeight: 110
                 visible: DropShelfState.items.length === 0
+                radius: Appearance.rounding.medium
+                color: Theme.fade(Appearance.colors.colLayer1, 0.6)
+                border.width: 1
+                border.color: dropZone.containsDrag ? Appearance.colors.colPrimary : Theme.fade(Theme.outline, 0.3)
 
                 ColumnLayout {
                     anchors.centerIn: parent
-                    spacing: Theme.pad.s
+                    spacing: 6
 
                     MaterialSymbol {
-                        Layout.alignment: Qt.AlignHCenter
+                        Layout.alignment: Qt.AlignCenter
                         text: dropZone.containsDrag ? "download" : "move_to_inbox"
-                        iconSize: 36
-                        color: dropZone.containsDrag ? Theme.accent : Theme.textFaint
+                        iconSize: 34
+                        color: Appearance.colors.colPrimary
                     }
 
                     StyledText {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: dropZone.containsDrag ? qsTr("Release to park files here") : qsTr("Drop files here to park them")
+                        Layout.alignment: Qt.AlignCenter
+                        text: dropZone.containsDrag ? qsTr("Drop files now to park") : qsTr("Drag & drop files or images here")
                         font.pixelSize: Theme.font.s
-                        color: dropZone.containsDrag ? Theme.accent : Theme.textFaint
+                        font.weight: Font.DemiBold
+                        color: Appearance.colors.colOnSecondaryContainer
+                    }
+
+                    StyledText {
+                        Layout.alignment: Qt.AlignCenter
+                        text: qsTr("Movable shelf • Drag out anywhere")
+                        font.pixelSize: Theme.font.xs
+                        color: Appearance.colors.colSubtext
                     }
                 }
             }
