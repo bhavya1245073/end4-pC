@@ -98,8 +98,11 @@ Scope {
 
             pluginId: modelData.pluginId
             entry: PluginRegistry.isLoaded(modelData.pluginId) ? modelData.url : ""
+            // The command name, resolved here rather than in the plugin: the manifest can name one,
+            // and the plugin id is the default. Injected instead of being a property on PluginIpc,
+            // because a property on an IpcHandler brings a change signal that IpcHandler warns about.
             inject: ({
-                pluginId: modelData.pluginId
+                target: modelData.target ?? modelData.pluginId
             })
         }
     }

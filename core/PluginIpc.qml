@@ -48,11 +48,10 @@ import Quickshell.Io
 IpcHandler {
     id: root
 
-    // Set by the host from the manifest, so a plugin does not have to repeat its own id.
-    property string pluginId: ""
-
-    // Defaults to the plugin id. Override for a nicer command name.
-    target: root.pluginId
+    // `target` is injected by the host: the plugin id, or the manifest entry's `target` if it names
+    // a nicer command. It is not a property declared here on purpose - IpcHandler inspects its own
+    // members to decide what to expose, and a declared property brings a `<name>Changed` signal with
+    // it, which it warns about on every load. One line of log noise per IPC plugin, every start.
 
     // Handlers are only reachable while the plugin is on; the host binds this.
     enabled: true

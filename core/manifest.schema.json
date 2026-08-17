@@ -122,7 +122,7 @@
         "ipc": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/entryOnly"
+            "$ref": "#/definitions/ipcEntry"
           }
         },
         "settingsPages": {
@@ -826,6 +826,26 @@
         "group": {
           "type": "string",
           "description": "Panels sharing a group close each other. \"overlay\" also means full-screen, which the bar and hot corners take into account."
+        }
+      }
+    },
+    "ipcEntry": {
+      "type": "object",
+      "required": [
+        "entry"
+      ],
+      "additionalProperties": false,
+      "description": "A file whose root is a PluginIpc; every annotated function in it becomes a command.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "target": {
+          "type": "string",
+          "description": "The command name. Defaults to the plugin id."
         }
       }
     }

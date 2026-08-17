@@ -371,11 +371,27 @@ ContentPage {
             }
 
             ConfigSwitch {
+                id: enableSwitch
                 buttonIcon: "power_settings_new"
                 text: Translation.tr("Enabled")
                 enabled: page.openManifest !== null && PluginRegistry.isSupported(page.openManifest)
                 checked: page.openPlugin !== "" && PluginRegistry.isEnabled(page.openPlugin)
-                onCheckedChanged: if (page.openPlugin !== "") PluginRegistry.setEnabled(page.openPlugin, checked)
+
+                // Deferred to the next tick on purpose. Writing straight from the handler puts the
+                // write inside the evaluation of the binding above it: setEnabled recomputes
+                // activeIds synchronously, isEnabled changes, and `checked` is re-evaluated while
+                // still inside onCheckedChanged - which Qt correctly calls a binding loop. Toggling
+                // every plugin off and on in sequence is what made it show up.
+                onCheckedChanged: {
+                    if (page.openPlugin === "")
+                        return;
+                    const target = enableSwitch.checked;
+                    const plugin = page.openPlugin;
+                    Qt.callLater(() => {
+                        if (PluginRegistry.isEnabled(plugin) !== target)
+                            PluginRegistry.setEnabled(plugin, target);
+                    });
+                }
             }
 
             // Settings are dimmed rather than hidden while the plugin is off, so

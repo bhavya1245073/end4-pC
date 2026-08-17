@@ -1,99 +1,100 @@
 {
-  "id": "battery",
-  "name": "Battery",
-  "version": "1.0.0",
-  "apiVersion": 1,
-  "description": "Battery level as a drawn capsule, with charge state, remaining time, health and cycles on hover.",
-  "author": "bhavya",
-  "icon": "battery_android_full",
-  "enabledByDefault": true,
-  "provides": {
-    "barWidgets": [
-      {
-        "id": "battery",
-        "name": "Battery Pill",
-        "icon": "battery_android_full",
-        "entry": "BatteryBarWidget.qml",
-        "pillColor": "secondaryContainer"
-      }
-    ],
-    "desktopWidgets": [
-      {
-        "id": "batteryDesktop",
-        "name": "Battery",
-        "icon": "battery_android_full",
-        "entry": "BatteryDesktopWidget.qml",
-        "enabledByDefault": true
-      }
-    ],
-    "ipc": [
-      {
-        "entry": "BatteryIpc.qml"
-      }
-    ],
-    "shortcuts": [
-      {
-        "id": "batteryReport",
-        "description": "Print battery status to the log",
-        "suggestedKey": "SUPER SHIFT, B",
-        "ipc": {
-          "target": "battery",
-          "function": "report"
+    "id": "battery",
+    "name": "Battery",
+    "version": "1.0.0",
+    "apiVersion": 1,
+    "description": "Battery level as a drawn capsule, with charge state, remaining time, health and cycles on hover.",
+    "author": "bhavya",
+    "icon": "battery_android_full",
+    "enabledByDefault": true,
+    "provides": {
+        "barWidgets": [
+            {
+                "id": "battery",
+                "name": "Battery Pill",
+                "icon": "battery_android_full",
+                "entry": "BatteryBarWidget.qml",
+                "pillColor": "secondaryContainer"
+            }
+        ],
+        "desktopWidgets": [
+            {
+                "id": "batteryDesktop",
+                "name": "Battery",
+                "icon": "battery_android_full",
+                "entry": "BatteryDesktopWidget.qml",
+                "enabledByDefault": true
+            }
+        ],
+        "ipc": [
+            {
+                "entry": "BatteryIpc.qml",
+                "target": "battery"
+            }
+        ],
+        "shortcuts": [
+            {
+                "id": "batteryReport",
+                "description": "Print battery status to the log",
+                "suggestedKey": "SUPER SHIFT, B",
+                "ipc": {
+                    "target": "battery",
+                    "function": "report"
+                }
+            }
+        ]
+    },
+    "settings": [
+        {
+            "key": "label",
+            "type": "enum",
+            "default": "percent",
+            "label": "Label",
+            "description": "What to show beside the capsule.",
+            "icon": "label",
+            "options": [
+                {
+                    "value": "none",
+                    "label": "Nothing"
+                },
+                {
+                    "value": "percent",
+                    "label": "Percentage"
+                },
+                {
+                    "value": "time",
+                    "label": "Time remaining"
+                }
+            ]
+        },
+        {
+            "key": "capsuleLength",
+            "type": "int",
+            "default": 26,
+            "min": 14,
+            "max": 48,
+            "step": 2,
+            "label": "Capsule width",
+            "icon": "straighten"
+        },
+        {
+            "key": "hideWhenFull",
+            "type": "bool",
+            "default": false,
+            "label": "Hide when fully charged",
+            "description": "Nothing to watch while it sits at 100% on mains.",
+            "icon": "visibility_off"
+        },
+        {
+            "key": "desktopSize",
+            "type": "int",
+            "default": 140,
+            "min": 80,
+            "max": 320,
+            "step": 10,
+            "label": "Desktop widget size",
+            "icon": "aspect_ratio",
+            "group": "Desktop widget"
         }
-      }
     ]
-  },
-  "settings": [
-    {
-      "key": "label",
-      "type": "enum",
-      "default": "percent",
-      "label": "Label",
-      "description": "What to show beside the capsule.",
-      "icon": "label",
-      "options": [
-        {
-          "value": "none",
-          "label": "Nothing"
-        },
-        {
-          "value": "percent",
-          "label": "Percentage"
-        },
-        {
-          "value": "time",
-          "label": "Time remaining"
-        }
-      ]
-    },
-    {
-      "key": "capsuleLength",
-      "type": "int",
-      "default": 26,
-      "min": 14,
-      "max": 48,
-      "step": 2,
-      "label": "Capsule width",
-      "icon": "straighten"
-    },
-    {
-      "key": "hideWhenFull",
-      "type": "bool",
-      "default": false,
-      "label": "Hide when fully charged",
-      "description": "Nothing to watch while it sits at 100% on mains.",
-      "icon": "visibility_off"
-    },
-    {
-      "key": "desktopSize",
-      "type": "int",
-      "default": 140,
-      "min": 80,
-      "max": 320,
-      "step": 10,
-      "label": "Desktop widget size",
-      "icon": "aspect_ratio",
-      "group": "Desktop widget"
-    }
-  ]
 }

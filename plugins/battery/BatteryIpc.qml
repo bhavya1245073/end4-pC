@@ -10,9 +10,8 @@
 import qs.core
 
 PluginIpc {
-    // Defaults to the plugin id, which is already "battery"; spelled out because this
-    // file is the worked example.
-    target: "battery"
+    // The command name lives in the manifest (`provides.ipc[].target`), not here: the host injects
+    // it, so the name a script types and the name the manifest documents cannot drift apart.
 
     function report(): string {
         if (!BatteryState.available)

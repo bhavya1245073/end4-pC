@@ -41,7 +41,7 @@
       {
         "kind": "ipc",
         "description": "",
-        "ref": "#/definitions/entryOnly"
+        "ref": "#/definitions/ipcEntry"
       },
       {
         "kind": "settingsPages",
@@ -782,6 +782,32 @@
           "group": {
             "type": "string",
             "description": "Panels sharing a group close each other. \"overlay\" also means full-screen, which the bar and hot corners take into account.",
+            "default": null,
+            "enum": null
+          }
+        }
+      },
+      "ipcEntry": {
+        "description": "A file whose root is a PluginIpc; every annotated function in it becomes a command.",
+        "required": [
+          "entry"
+        ],
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "entry": {
+            "type": "#/definitions/qmlFile",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "target": {
+            "type": "string",
+            "description": "The command name. Defaults to the plugin id.",
             "default": null,
             "enum": null
           }
@@ -2573,15 +2599,7 @@
         "kind": "type",
         "extends": "IpcHandler",
         "summary": "An IPC target owned by a plugin.",
-        "members": [
-          {
-            "kind": "property",
-            "name": "pluginId",
-            "type": "string",
-            "default": "\"\"",
-            "doc": "Set by the host from the manifest, so a plugin does not have to repeat its own id."
-          }
-        ]
+        "members": []
       },
       {
         "name": "PluginListView",

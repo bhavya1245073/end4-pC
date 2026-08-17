@@ -116,9 +116,9 @@ ContentPage {
                 }
             }
             RowLayout {
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                anchors.margins: 0
+                // Anchors inside a layout are undefined behaviour and Qt says so on every load;
+                // the intent here is "bottom right of the row I am in".
+                Layout.alignment: Qt.AlignRight | Qt.AlignBottom
                 spacing: 8
                 RippleButton {
                     buttonText: Translation.tr("Update Dots")

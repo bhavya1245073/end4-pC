@@ -11,7 +11,6 @@
 import qs.core
 
 PluginIpc {
-    target: "dropover"
 
     function show(): string {
         PanelRegistry.open("dropover", ({}));
