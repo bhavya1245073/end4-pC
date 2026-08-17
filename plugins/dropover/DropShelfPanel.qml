@@ -26,17 +26,20 @@ PanelWindow {
     // Where it was dropped, from the open request. Defaults to the middle of the screen for an
     // open with no arguments - `qs ipc call dropover show`, for instance.
     readonly property var openArgs: PanelRegistry.state("dropover").args
-    property real posX: Math.max(20, (shelfRoot.openArgs.x ?? Screen.width / 2) - implicitWidth / 2)
-    property real posY: Math.max(20, (shelfRoot.openArgs.y ?? Screen.height / 2) - implicitHeight - 30)
+    readonly property real shelfWidth: 420
+    property real posX: Math.max(20, (shelfRoot.openArgs.x ?? Screen.width / 2) - shelfRoot.shelfWidth / 2)
+    property real posY: Math.max(20, (shelfRoot.openArgs.y ?? Screen.height / 2) - shelfBg.implicitHeight - 30)
 
-    anchors { top: true; left: true }
-    margins {
-        left: shelfRoot.posX
-        top: shelfRoot.posY
+    // Full-screen surface with the shelf positioned inside it, rather than a shelf-sized surface
+    // moved by layer-shell margins. A margin change is a configure round-trip through the
+    // compositor, so dragging the shelf that way left it trailing the pointer; moving an Item
+    // inside a mapped surface is client-side and keeps up.
+    anchors { top: true; left: true; right: true; bottom: true }
+
+    // Input only where the shelf is, so everything under the rest of the screen stays usable.
+    mask: Region {
+        item: shelfBg
     }
-
-    implicitWidth: 420
-    implicitHeight: shelfBg.implicitHeight
 
     // Re-anchor to drop location on open
     Connections {
@@ -46,8 +49,8 @@ PanelWindow {
                 const args = PanelRegistry.state("dropover").args;
                 const wantedX = args.x ?? Screen.width / 2;
                 const wantedY = args.y ?? Screen.height / 2;
-                shelfRoot.posX = Math.max(20, Math.min(Screen.width - shelfRoot.implicitWidth - 20, wantedX - shelfRoot.implicitWidth / 2));
-                shelfRoot.posY = Math.max(20, Math.min(Screen.height - shelfRoot.implicitHeight - 40, wantedY - shelfRoot.implicitHeight - 30));
+                shelfRoot.posX = Math.max(20, Math.min(Screen.width - shelfRoot.shelfWidth - 20, wantedX - shelfRoot.shelfWidth / 2));
+                shelfRoot.posY = Math.max(20, Math.min(Screen.height - shelfBg.implicitHeight - 40, wantedY - shelfBg.implicitHeight - 30));
             }
         }
     }
@@ -59,10 +62,11 @@ PanelWindow {
     // ── Outer Background & Drop Receiver ──────────────────────────────────────
     Rectangle {
         id: shelfBg
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
+        x: shelfRoot.posX
+        y: shelfRoot.posY
+        width: shelfRoot.shelfWidth
         implicitHeight: contentColumn.implicitHeight + (Theme.pad.l * 2)
+        height: implicitHeight
 
         radius: Theme.radius.l
         color: Theme.solid
@@ -121,8 +125,8 @@ PanelWindow {
 
                     onTranslationChanged: {
                         if (!active) return;
-                        shelfRoot.posX = Math.max(10, Math.min(Screen.width - shelfRoot.implicitWidth - 10, startX + translation.x));
-                        shelfRoot.posY = Math.max(10, Math.min(Screen.height - shelfRoot.implicitHeight - 10, startY + translation.y));
+                        shelfRoot.posX = Math.max(10, Math.min(Screen.width - shelfRoot.shelfWidth - 10, startX + translation.x));
+                        shelfRoot.posY = Math.max(10, Math.min(Screen.height - shelfBg.implicitHeight - 10, startY + translation.y));
                     }
                 }
 

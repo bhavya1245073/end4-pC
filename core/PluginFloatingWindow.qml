@@ -272,14 +272,42 @@ Item {
             anchors {
                 top: true
                 left: true
-            }
-            margins {
-                left: root.windowX
-                top: root.windowY
+                right: true
+                bottom: true
             }
 
-            implicitWidth: root.windowWidth
-            implicitHeight: root.windowHeight
+            // The surface covers the screen and the card is positioned *inside* it, rather than
+            // the surface being card-sized and moved with layer-shell margins.
+            //
+            // Margins are protocol state: every change is a configure round-trip through the
+            // compositor, so a window dragged that way is always at least a frame behind the
+            // pointer and visibly rubber-bands on a busy frame. Moving an Item within an
+            // already-mapped surface is client-side and lands in the same frame as the pointer
+            // event that caused it. Resizing has the same problem and the same fix.
+            //
+            // The cost is one full-screen transparent surface per open window, which is why it is
+            // behind a LazyLoader keyed on `open`.
+
+            // Input only where the card is, so the desktop and the applications under the rest of
+            // the surface stay clickable. `Region { item: frame }` is the whole card; no mask at
+            // all means the whole screen, which is what click-outside dismissal needs.
+            //
+            // Not `Region { item: null }` for that case - an empty region accepts nothing, so the
+            // window would take no clicks whatsoever.
+            mask: root.closeOnClickOutside ? null : cardRegion
+
+            Region {
+                id: cardRegion
+                item: frame
+            }
+
+            // Click-outside dismissal, when asked for. On the same surface rather than a second
+            // one below it: two surfaces meant two configure sequences and an ordering the
+            // compositor was free to interleave.
+            TapHandler {
+                enabled: root.closeOnClickOutside
+                onTapped: root.hide()
+            }
 
             // Click-outside needs a surface covering the screen, which is a real cost, so it
             // exists only when asked for.
@@ -287,15 +315,31 @@ Item {
                 id: insideHover
             }
 
+            // A real shadow, now that the card no longer fills its surface: it lifts the window
+            // off whatever application is behind it.
+            StyledRectangularShadow {
+                target: frame
+            }
+
             Rectangle {
                 id: frame
-                anchors.fill: parent
+                x: root.windowX
+                y: root.windowY
+                width: root.windowWidth
+                height: root.windowHeight
                 radius: Appearance.rounding.normal
                 color: Theme.solid
                 border.width: 1
                 border.color: Theme.fade(Theme.outline, 0.25)
                 focus: true
                 Keys.onEscapePressed: if (root.closeOnEscape) root.hide()
+
+                // Swallows clicks that land on the card but miss everything in it, so a click on
+                // the card's own padding does not fall through to the dismiss handler behind it.
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.AllButtons
+                }
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -433,21 +477,6 @@ Item {
         }
     }
 
-    // Click-outside dismissal, as its own transparent full-screen surface below the window.
-    LazyLoader {
-        activeAsync: root.open && root.closeOnClickOutside
-
-        PanelWindow {
-            visible: root.open && root.closeOnClickOutside
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Top
-            WlrLayershell.namespace: `quickshell:pluginWindowDismiss:${root.pluginId}`
-            anchors { top: true; left: true; right: true; bottom: true }
-
-            TapHandler {
-                onTapped: root.open = false
-            }
-        }
-    }
+    // Click-outside dismissal now lives on the window's own surface - see the `mask` above - so
+    // there is no second surface to keep in step with the first.
 }
