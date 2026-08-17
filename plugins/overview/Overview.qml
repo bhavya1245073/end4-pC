@@ -213,6 +213,20 @@ Scope {
                 GlobalStates.superReleaseMightTrigger = true;
                 return;
             }
+            // Never open the overview *over* another full-screen overlay. Everything in the
+            // "overlay" group is mutually exclusive, so toggling here does not stack on top of the
+            // region selector - it closes it, mid-drag, which reads as "the snip tool vanishes
+            // unless I keep holding the keys".
+            //
+            // The interrupt shortcut is supposed to prevent this, but it can only fire for
+            // modifier combinations the compositor config actually binds it to, and that list is
+            // never complete - SUPER + SHIFT + S, the screen snip itself, was missing. This makes
+            // the release harmless regardless of what is bound.
+            //
+            // The overview is excepted: when it is the overlay that is open, SUPER release is how
+            // you dismiss it.
+            if (PanelRegistry.anyOverlayOpen && !PanelRegistry.state("overview").open)
+                return;
             PanelRegistry.toggle("overview");
         }
     }

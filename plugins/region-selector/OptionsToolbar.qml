@@ -28,22 +28,16 @@ Toolbar {
             {"icon": "activity_zone", "name": Translation.tr("Rect")},
             {"icon": "gesture", "name": Translation.tr("Circle")}
         ]
+        // One-way: the mode drives the strip, and only a real click drives the mode.
+        //
+        // Binding `currentIndex` to the mode *and* writing the mode back from
+        // `onCurrentIndexChanged` is a two-way binding. Qt resolves that by dropping the binding,
+        // and the handler's first value wins - including the transient one from before
+        // `selectionMode` has been synchronised in, which evaluates the ternary against undefined
+        // and yields 1. That is why the snip tool opened with the lasso instead of the rectangle.
         currentIndex: root.selectionMode === RegionSelection.SelectionMode.RectCorners ? 0 : 1
-        onCurrentIndexChanged: {
-            const newMode = currentIndex === 0 ? RegionSelection.SelectionMode.RectCorners : RegionSelection.SelectionMode.Circle;
-            if (root.selectionMode === newMode)
-                return;
-            // Deferred, not written straight from the handler. `currentIndex` is bound to
-            // `selectionMode`, so assigning it here is a write during the evaluation of the
-            // binding that triggered it - which Qt correctly calls a binding loop, and resolves
-            // by dropping the binding. The tab strip then stops following the mode.
-            //
-            // The equality check above is not enough on its own: Qt reports the cycle, not the
-            // value, so writing the same value in the same pass is still a loop.
-            Qt.callLater(() => {
-                if (root.selectionMode !== newMode)
-                    root.selectionMode = newMode;
-            });
+        onTabClicked: index => {
+            root.selectionMode = index === 0 ? RegionSelection.SelectionMode.RectCorners : RegionSelection.SelectionMode.Circle;
         }
     }
 }

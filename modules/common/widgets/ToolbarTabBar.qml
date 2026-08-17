@@ -11,6 +11,13 @@ Item {
     property alias currentIndex: tabBar.currentIndex
     required property var tabButtonList
 
+    // Emitted only when the user clicks a tab, which `onCurrentIndexChanged` cannot tell you:
+    // that fires for a programmatic change and for a binding re-evaluating too. A consumer that
+    // binds `currentIndex` to its own state and writes that state back from
+    // `onCurrentIndexChanged` has built a two-way binding, and Qt resolves those by dropping the
+    // binding - after which the strip and the state disagree permanently.
+    signal tabClicked(int index)
+
     function incrementCurrentIndex() {
         tabBar.incrementCurrentIndex();
     }
@@ -33,6 +40,7 @@ Item {
         materialSymbol: modelData.icon
         onClicked: {
             root.setCurrentIndex(index);
+            root.tabClicked(index);
         }
     }
 

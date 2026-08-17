@@ -260,23 +260,19 @@ PanelWindow {
                         }
                     }
 
-                    delegate: Item {
+                    delegate: PluginDraggable {
                         id: cardDelegate
                         required property string modelData
                         required property int index
 
-                        width: 105
+                        width: 110
                         height: 120
 
-                        readonly property string itemPath: modelData
-                        readonly property bool isImage: /\.(png|jpe?g|webp|bmp|gif|svg)$/i.test(itemPath)
-                        readonly property string fileName: itemPath.split("/").filter(Boolean).pop() || "file"
+                        path: modelData
 
-                        // Drag payload for dragging OUT to external windows
-                        Drag.active: cardDragArea.drag.active
-                        Drag.dragType: Drag.Automatic
-                        Drag.mimeData: { "text/uri-list": "file://" + cardDelegate.itemPath }
-                        Drag.supportedActions: Qt.CopyAction
+                        onClicked: {
+                            Qt.openUrlExternally("file://" + cardDelegate.path);
+                        }
 
                         Rectangle {
                             id: cardBg
@@ -284,7 +280,7 @@ PanelWindow {
                             radius: Theme.radius.m
                             color: cardHover.containsMouse ? Theme.top : Theme.raised
                             border.width: 1
-                            border.color: cardDragArea.drag.active ? Theme.accent : Theme.fade(Theme.outline, 0.4)
+                            border.color: cardDelegate.dragging ? Theme.accent : Theme.fade(Theme.outline, 0.4)
                             clip: true
 
                             Behavior on color {
@@ -293,12 +289,12 @@ PanelWindow {
 
                             // Image Thumbnail
                             StyledImage {
-                                visible: cardDelegate.isImage
+                                visible: /\.(png|jpe?g|webp|bmp|gif|svg)$/i.test(cardDelegate.path)
                                 anchors.top: parent.top
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 height: 80
-                                source: "file://" + cardDelegate.itemPath
+                                source: "file://" + cardDelegate.path
                                 fillMode: Image.PreserveAspectCrop
                                 cache: true
                                 asynchronous: true
@@ -306,7 +302,7 @@ PanelWindow {
 
                             // Non-Image File Icon
                             Item {
-                                visible: !cardDelegate.isImage
+                                visible: !/\.(png|jpe?g|webp|bmp|gif|svg)$/i.test(cardDelegate.path)
                                 anchors.top: parent.top
                                 anchors.left: parent.left
                                 anchors.right: parent.right
@@ -314,7 +310,7 @@ PanelWindow {
 
                                 MaterialSymbol {
                                     anchors.centerIn: parent
-                                    text: cardDelegate.itemPath.endsWith("/") ? "folder" : "draft"
+                                    text: cardDelegate.path.endsWith("/") ? "folder" : "draft"
                                     iconSize: 36
                                     color: Theme.accent
                                 }
@@ -331,7 +327,7 @@ PanelWindow {
                                 StyledText {
                                     anchors.fill: parent
                                     anchors.margins: 4
-                                    text: cardDelegate.fileName
+                                    text: cardDelegate.path.split("/").filter(Boolean).pop() || "file"
                                     font.pixelSize: Theme.font.xs
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
@@ -348,12 +344,13 @@ PanelWindow {
                                 anchors.top: parent.top
                                 anchors.right: parent.right
                                 anchors.margins: 4
-                                width: 20
-                                height: 20
-                                radius: 10
+                                width: 22
+                                height: 22
+                                radius: 11
                                 color: Theme.solid
                                 border.width: 1
                                 border.color: Theme.outlineDim
+                                z: 10
 
                                 MaterialSymbol {
                                     anchors.centerIn: parent
@@ -371,32 +368,6 @@ PanelWindow {
                                         }
                                     }
                                 }
-                            }
-                        }
-
-                        // Card Interactive MouseArea for Dragging Out & Opening
-                        MouseArea {
-                            id: cardDragArea
-                            anchors.fill: parent
-                            drag.target: cardDelegate
-                            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
-                            onPressed: {
-                                cardDelegate.grabToImage((result) => {
-                                    cardDelegate.Drag.imageSource = result.url;
-                                });
-                            }
-
-                            onReleased: {
-                                if (cardDelegate.Drag.active) {
-                                    cardDelegate.Drag.drop();
-                                }
-                                cardDelegate.x = 0;
-                                cardDelegate.y = 0;
-                            }
-
-                            onDoubleClicked: {
-                                Qt.openUrlExternally("file://" + cardDelegate.itemPath);
                             }
                         }
 
