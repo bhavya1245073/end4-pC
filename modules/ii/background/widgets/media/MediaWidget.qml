@@ -78,11 +78,28 @@ AbstractBackgroundWidget {
     readonly property real heightEnterFraction: 0.2
     readonly property real heightEnterDelta: (root.doubleCardHeight - root.cardHeight) * root.heightEnterFraction
 
+    // The size mode as it was when the resize gesture began.
+    //
+    // Captured once per gesture because a decision that reads the mode it also writes cannot
+    // settle: dragging down entered "2x3", which made the "am I in 1x3" test false, which sent the
+    // very next mouse event back to "1x3", which made the test true again. The widget therefore
+    // flipped between the two on every move - the lyrics panel appearing and vanishing, the height
+    // jumping - for as long as the mouse was held.
+    property string dragStartMode: root.sizeMode
+
     function modeForDrag(dx, dy, startWidth) {
-        if (root.sizeMode === "1x3" && dy > root.heightEnterDelta) {
-            return "2x3"
-        }
-        return root.modeForWidth(startWidth + dx)
+        const widthMode = root.modeForWidth(startWidth + dx)
+
+        // Below full width there is no tall variant, so width alone decides.
+        if (widthMode !== "1x3")
+            return widthMode
+
+        // At full width, vertical travel picks between 1x3 and its tall form. Measured from where
+        // the gesture started, with a dead zone either side, so the answer depends only on the
+        // gesture and not on what the last event produced.
+        if (root.dragStartMode === "2x3")
+            return dy < -root.heightEnterDelta ? "1x3" : "2x3"
+        return dy > root.heightEnterDelta ? "2x3" : "1x3"
     }
 
     Behavior on widgetWidth {
@@ -761,6 +778,7 @@ AbstractBackgroundWidget {
             locked: Config.options.background.widgetsLocked
             currentWidth: root.widgetWidth
             resizeMode: "diagonal"
+            onResizeStarted: { root.dragStartMode = root.sizeMode }
             onResizedXY: (dx, dy, startWidth) => { root.sizeMode = root.modeForDrag(dx, dy, startWidth) }
             onResizeFinished: { root.configEntry.sizeMode = root.sizeMode }
         }

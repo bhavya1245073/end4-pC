@@ -12,6 +12,7 @@ Canvas {
 
     signal resized(real newValue)
     signal resizedXY(real dx, real dy, real startWidth)
+    signal resizeStarted()
     signal resizeFinished()
 
     width: 62
@@ -61,6 +62,7 @@ Canvas {
             var globalPos = mapToItem(null, mouse.x, mouse.y)
             startX = globalPos.x
             startY = globalPos.y
+            root.resizeStarted()
         }
         onPositionChanged: (mouse) => {
             if (!pressed) return
