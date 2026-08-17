@@ -240,6 +240,69 @@ Behavior on color { animation: Theme.anim.fast.colorAnimation.createObject(this)
 Behavior on width { animation: Theme.anim.normal.numberAnimation.createObject(this) }
 ```
 
+## Never shell out — look here first
+
+The single most common way plugin code goes wrong is
+`Quickshell.execDetached(["bash", "-c", ...])`. It costs a process, gives you no
+result, and if any part of the string came from outside the plugin it is a command
+injection. Every one of these is a singleton in `qs.core`:
+
+| Want | Use |
+| --- | --- |
+| CPU / memory / GPU / net / disk numbers | `PluginSystem.cpu.usagePercent`, `.memory.usedFormatted`, `.gpu.usagePercent`, `.network.downloadFormatted`, `.disks.forPath("/")` |
+| volume, per-app streams, spectrum | `PluginAudio`, `PluginSpectrum` |
+| what is playing | `PluginMedia.title`, `.playPause()` |
+| windows, workspaces, monitors | `PluginWM` — works on Hyprland and Niri both |
+| battery, suspend, lock, inhibitors | `PluginPower` |
+| brightness, night light | `PluginDisplay` |
+| Wi-Fi, VPNs | `PluginNetwork` |
+| Bluetooth | `PluginBluetooth` |
+| is the mic/camera/screen in use | `PluginPrivacy` |
+| notifications, do-not-disturb | `PluginNotifications` |
+| installed apps, launching, pinning | `PluginApps` |
+| ask the user something | `PluginDialogs.confirm/prompt/choose/alert`, `openFile`, `saveFile` |
+| read or write a file | `PluginFs`, `PluginFsWatch` |
+| any kind of timer | `PluginTimer.after/every/debounce/throttle/cron/at` |
+| remember something between runs | `PluginStore` / `PluginStorage` |
+| talk to another plugin | `PluginBus` / `PluginBusListener` |
+| clipboard, notify, HTTP, run a command | `PluginUtils.copy/notify/fetchJson/run/pipe/copyFile` |
+
+`scripts/api.sh <name>` prints any of them in full, from the generated catalogue in
+`core/api.json`. Check there before writing a `Process`.
+
+If you do need to run something: `PluginUtils.run(argv, callback)` for output,
+`PluginUtils.pipe(argv, payload, callback)` to feed it stdin. Never build a shell
+string around data. If a shell is genuinely unavoidable, put the script in the `-c`
+argument and pass data as `$1`, `$2` — never interpolate it into the script text.
+
+## Panels
+
+Every window in the shell, its own and every plugin's, is a row in `PanelRegistry`:
+
+```qml
+PanelRegistry.toggle("sidebarRight")
+PanelRegistry.open("myPanel", { x: mouseX, y: mouseY })   // args, not globals
+PanelRegistry.close("myPanel")
+```
+
+```bash
+qs -c end4-pC ipc call panels list        # every panel and whether it is open
+qs -c end4-pC ipc call panels toggle overview
+```
+
+A plugin's `panels` entry is registered automatically, so anything can open it by id
+without importing the plugin. To react to a panel, bind rather than poll:
+
+```qml
+PanelState { panel: "launcher"; onOpenChanged: if (open) refresh() }
+```
+
+Inside the panel, read what the caller passed:
+`PanelRegistry.state("myPanel").args.x`.
+
+Do **not** add a `property bool somethingOpen` to a singleton for this. That is what
+this replaced: ~290 references to named booleans that no plugin could join.
+
 ## Base types
 
 Use these. They exist because each one is a pile of detail that is invisible when
@@ -306,6 +369,37 @@ PluginBackgroundWidget {
 }
 ```
 
+### The rest of the kit
+
+All in `qs.core`, all themed, none of them needing styling from you:
+
+| Type | For |
+| --- | --- |
+| `PluginDrawer` | a panel sliding in from an edge, optionally reserving space |
+| `PluginFloatingWindow` | movable, resizable, geometry remembered across restarts |
+| `PluginHud` | a transient overlay — `flash()` and it fades itself out |
+| `PluginForm` | a whole form from a field list (same schema as manifest `settings`) |
+| `PluginTabs`, `PluginListView` | tab strip with a sliding indicator; searchable list with an empty state |
+| `PluginSparkline`, `PluginGauge` | a chart and a radial meter, repainting only on change |
+| `PluginIconButton`, `PluginChip`, `PluginBadge` | the interactive small parts, with hover/press/focus already right |
+| `PluginAppear` | staggered entrance animation in one line: `PluginAppear { index: model.index }` |
+| `PluginDesktopCard` | a desktop widget surface, opaque and correctly shadowed |
+
+### Motion
+
+Use `Theme.motion`, never a hardcoded duration or curve:
+
+```qml
+Behavior on opacity {
+    NumberAnimation { duration: Theme.motion.fast; easing.bezierCurve: Theme.motion.standard; easing.type: Easing.Bezier }
+}
+```
+
+Durations: `instant` 90, `fast` 200, `medium` 350, `slow` 500, `enter` 400, `exit` 200.
+Curves: `spatial`, `spatialFast`, `effects`, `emphasized`, `decelerate`, `accelerate`,
+`standard`. And `Theme.motion.delay(index)` for staggering. A plugin using them moves like the shell;
+one using `duration: 200; Easing.OutQuad` visibly does not.
+
 ## What a plugin can provide
 
 Every kind is an array under `provides`. Each entry needs an `id`; most need
@@ -316,13 +410,17 @@ Every kind is an array under `provides`. Each entry needs an `id`; most need
 | `barWidgets` | a widget the user can place in the bar | `name`, `icon`, `pillColor`, `materialPill`, `multipleAllowed` |
 | `desktopWidgets` | a draggable desktop widget | `name`, `icon`, `enabledByDefault` |
 | `quickToggles` | a tile in the sidebar's quick settings panel | `classicEntry`, `menu`, `requires` |
-| `panels` | a window the plugin owns and shows itself | — |
+| `panels` | a window the plugin owns, addressable through `PanelRegistry` | `label`, `group` |
 | `services` | a non-visual always-on object: timers, watchers | — |
 | `ipc` | commands on the shell's command line | root type `PluginIpc` |
 | `settingsPages` | a whole page in Settings, with a nav entry | `name`, `icon`, `order` |
 | `settingsSections` | a section injected into an **existing** Settings page | `page`, `order` |
 | `launcherActions` | a result in the launcher | `exec` |
 | `shortcuts` | a keybind, bound as `quickshell:<id>` | `description`, `suggestedKey`, plus `exec` **or** `ipc` |
+| `searchProviders` | live results in the launcher | root type `PluginSearchProvider`; set `prefix` to claim one |
+| `contextMenuItems` | a row in the desktop right-click menu | `label`, `icon`, `order`, and one of `panel` / `ipc` / `exec` / `url` / `entry`; `badge` names a bus topic |
+| `osdIndicators` | an OSD of your own, raised with `OsdRegistry.show()` | — |
+| `sidebarTabs` | a full-height tab in the left sidebar | `label`, `icon`, `order`, `requires` |
 
 `settingsSections` is how a plugin's settings sit next to the related built-in
 ones *and disappear when the plugin is switched off*. Host pages render

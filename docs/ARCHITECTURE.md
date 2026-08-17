@@ -27,7 +27,7 @@ left in `modules/ii/` is there because plugins extend it:
 | `bar`, `verticalBar` | host `barWidgets` |
 | `background` | hosts `desktopWidgets` |
 | `settings` | renders `settingsPages`, `settingsSections`, generated forms |
-| `sidebarLeft`, `sidebarRight` | the panels bar widgets open onto; hosts `quickToggles` |
+| `sidebarLeft`, `sidebarRight` | the panels bar widgets open onto; host `quickToggles` and `sidebarTabs` |
 
 Everything else ships as a plugin — twenty of them, nineteen enabled by default:
 `dock`, `overview`, `lock`, `overlay`, `polkit`, `region-selector`, `session-screen`,
@@ -55,11 +55,52 @@ the same shape. A host reads one list and cannot tell which is which.
 | `BarWidgetRegistry` | bar widgets: file, name, icon, pill preference, pill colour, repeatability |
 | `DesktopWidgetRegistry` | desktop widgets: file, name, icon, where the enabled flag lives |
 | `QuickToggleRegistry` | quick toggles: file per panel style, dialog, required compositor |
+| `PanelRegistry` | every window the shell can open: whether it is open, its arguments, its exclusivity group |
+| `SidebarTabRegistry` | left sidebar tabs, the shell's four included |
+| `ContextMenuRegistry` | desktop right-click rows, as declarative verbs |
+| `OsdRegistry` | on-screen displays |
+| `PluginSearch` | launcher search providers |
 
 This is what removed `AndroidToggleDelegateChooser.qml` (17 `DelegateChoice` branches
 × 11 property assignments), a hardcoded 11-row widget list in `WidgetsSubmenu.qml`, a
-19-entry duplicate in `BarConfig.qml`, and a 167-line block of hand-written loaders in
-`Background.qml`.
+19-entry duplicate in `BarConfig.qml`, a 167-line block of hand-written loaders in
+`Background.qml`, two parallel arrays in `SidebarLeftContent.qml`, and roughly 290
+references to named booleans on `GlobalStates`.
+
+### Panels: from named booleans to a registry
+
+The clearest case. Panel visibility was a singleton of booleans -
+`GlobalStates.sidebarRightOpen`, `overviewOpen`, `launcherOpen`, twenty-odd of them -
+and every panel, bar button, keybind, hot corner and context menu row named one
+directly. A plugin could not add a panel to that list without editing core, and core
+had to know each panel's name to close it.
+
+`PanelRegistry` holds a row per panel with its open state, the arguments it was opened
+with, and its group. Everything addresses panels by id:
+
+```qml
+PanelRegistry.toggle("sidebarRight")
+PanelRegistry.open("desktopMenu", { x: mouseX, y: mouseY, screen: screen.name })
+```
+
+```bash
+qs -c end4-pC ipc call panels toggle overview
+```
+
+Coordinates that used to be their own globals - `dropShelfX`, `desktopMenuY`,
+`wallpaperSelectorTarget` - are now just arguments to `open()`, which is why they are
+no longer core's business. Panels in the same group close each other, so the
+six full-screen overlays stopped needing to close each other by name.
+
+`GlobalStates` still exists, holding what is genuinely global session state: whether
+the screen is locked, whether Super is held, which settings page is showing.
+
+### The desktop menu has no branches left
+
+Rows in `ContextMenuRegistry` are declarative verbs - `panel`, `ipc`, `exec`, `url`,
+`entry` for a submenu - with `$menuX`, `$menuY` and `$screen` substituted at activation
+and `badge` naming a `PluginBus` topic to display. The delegate that draws a row has
+one code path, and a plugin's row and a built-in row are the same kind of object.
 
 ## What core/ contains
 
@@ -81,13 +122,38 @@ at runtime, most visibly on the lock screen. It must be complete, not minimal; t
 are 25 imports in it.
 
 **Base types plugins inherit** — `PluginBarWidget`, `PluginBackgroundWidget`,
-`PluginPopup`, `PluginRow`, `PluginCard`, `PluginSeparator`, `PluginSettingRow`,
-`PluginSettingsForm`, `PluginSections`, `PluginShortcut`, `PluginIpc`, and `Theme`,
-which is the whole theming API a plugin needs.
+`PluginPopup`, `PluginDrawer`, `PluginFloatingWindow`, `PluginHud`, `PluginRow`,
+`PluginCard`, `PluginDesktopCard`, `PluginSeparator`, `PluginSettingRow`,
+`PluginSettingsForm`, `PluginSections`, `PluginForm`, `PluginShortcut`, `PluginIpc`,
+`PluginIconButton`, `PluginChip`, `PluginBadge`, `PluginTabs`, `PluginListView`,
+`PluginSparkline`, `PluginGauge`, `PluginAppear`, `PluginTransition`,
+`PluginSearchProvider`, `PluginSpectrum`, `PluginStore`, `PluginBusListener`,
+`PluginFsWatch`, `PanelState`, and `Theme`, which is the whole theming API a plugin
+needs. `core/api.json` is the generated catalogue of all of them; `scripts/api.sh
+<name>` prints one.
+
+**System facades** — the reason a plugin never has to shell out. `PluginSystem`
+(CPU, memory, GPU, network, disks, read straight from `/proc` and `/sys`, once for
+every reader), `PluginAudio`, `PluginMedia`, `PluginWM` (compositor-agnostic),
+`PluginPower`, `PluginDisplay`, `PluginNetwork`, `PluginBluetooth`, `PluginPrivacy`,
+`PluginNotifications`, `PluginApps`, `PluginDialogs`, `PluginFs`, `PluginTimer`,
+`PluginStorage`, `PluginBus`, `PluginUtils`.
+
+Three of those exist because the obvious implementation was wrong rather than merely
+missing. `PluginPrivacy` replaced a `Privacy.qml` that assigned arrays to `bool`
+properties, so an empty list read as `true`. Its camera detection uses `fuser` on
+`/dev/video*`, because an application that opens the device directly is invisible to
+Pipewire. `PluginUtils.pipe` exists because the alternative - `bash -c` with a payload
+interpolated into the string - was how the clipboard service handled arbitrary copied
+text.
+
+**Theming** — `Theme` plus `Palette.js`, which generates a full Material 3 tonal
+palette from one colour in CIELCh, so a plugin can theme itself from an album cover or
+a wallpaper without the shell's colour pipeline being involved.
 
 **Performance** — see below: `ComponentCache`, `Prewarm`, `Stable`, `Memo.js`, `Perf`.
 
-**Command line** — `PluginCommands` provides the `plugins` IPC target.
+**Command line** — `PluginCommands` provides the `plugins` and `panels` IPC targets.
 
 ## What happens when you toggle a plugin
 
@@ -176,24 +242,44 @@ from `qs.modules.ii.sidebarRight.volumeMixer`. Moving those two into
 
 ## Checks
 
-`scripts/check-qml.sh [subtree]` has six phases and exits non-zero on any failure, so
+`scripts/check-qml.sh [subtree]` has ten phases and exits non-zero on any failure, so
 it works as a pre-commit hook. The later phases exist because each caught a bug that
 compiled cleanly:
 
 | Phase | Finds |
 | --- | --- |
-| 1 | files whose imports or types do not resolve (565 files) |
-| 2 | URL-loaded entry points that fail with only `shell.qml`'s imports (42) |
+| 1 | files whose imports or types do not resolve (610 files) |
+| 2 | URL-loaded entry points that fail with only `shell.qml`'s imports (43) |
 | 3 | singleton name clashes |
-| 4 | singletons used without importing their module |
+| 4 | singletons used without importing their module (111 singletons, every module) |
 | 5 | uninitialised `required` properties in URL-loaded components |
 | 6 | **runtime**: binding loops, and memoised lists that disagree with a fresh computation |
+| 7 | `pragma Singleton` the scanner cannot reach |
+| 8 | manifests that do not match `core/manifest.schema.json` |
+| 9 | a stale `core/api.json` |
+| 10 | **runtime**: errors logged with every panel open |
 
 Phase 5 exists because a `required property` makes a component unconstructible, so a
 `Loader` reports `Loader.Error` and draws nothing — invisible to phases 1–4, which only
-compile. Phase 6 is the only phase that runs anything: it loads the registries with
-their real consumers in an invisible window, because a dropped binding and a poisoned
-cache both compile perfectly.
+compile. Phase 6 loads the registries with their real consumers in an invisible window,
+because a dropped binding and a poisoned cache both compile perfectly.
+
+Phase 7 exists because Quickshell's scanner stops looking for `pragma Singleton` at the
+first `{` in the file — including one inside a comment — so a singleton with a header
+comment above the pragma is silently not a singleton. Three files shipped that way.
+
+Phase 10 is the newest and the widest: it launches the shell against a scratch config,
+opens every panel in `PanelRegistry` plus the settings window, and fails on any
+`ReferenceError`, `TypeError`, binding loop or failed load. It exists because all nine
+static phases passed while the running shell logged two real defects — a function called
+in one file and defined in another, and an assignment to a `Control`'s read-only
+`mirrored` that `hasOwnProperty` had cleared. Both are the same shape: a name that
+resolves at compile time and is wrong at run time.
+
+Phase 4 originally checked only `core/` and `services/`; it now derives the module path
+of every directory containing a singleton, which immediately found two missing
+`qs.modules.common.functions` imports that would each have been a runtime
+`ReferenceError`.
 
 `scripts/check-icons.sh` validates every Material Symbol name against the installed
 font by rendering it and measuring. An unknown ligature is not an error and draws no

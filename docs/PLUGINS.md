@@ -620,9 +620,10 @@ plugin's UI changes with the wallpaper along with the rest of the shell.
 
 ### Motion
 
-`Theme.motion` is the shell's animation vocabulary: four durations
-(`instant`, `quick`, `normal`, `slow`), seven curves (`standard`, `decel`, `accel`,
-`emphasized`, `spring`, `bounce`, `linear`), and `Theme.motion.delay(index)` for
+`Theme.motion` is the shell's animation vocabulary: six durations
+(`instant` 90, `fast` 200, `medium` 350, `slow` 500, and `enter` 400 / `exit` 200 -
+arriving is slower than leaving on purpose), seven curves (`spatial`, `spatialFast`,
+`effects`, `emphasized`, `decelerate`, `accelerate`, `standard`), and `Theme.motion.delay(index)` for
 staggering a list without every widget inventing its own timing.
 
 ```qml
