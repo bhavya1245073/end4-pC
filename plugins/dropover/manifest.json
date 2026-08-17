@@ -18,6 +18,14 @@
         "entry": "DropShelfPanel.qml"
       }
     ],
+    "barWidgets": [
+      {
+        "id": "dropShelf",
+        "name": "Drop Shelf",
+        "icon": "move_to_inbox",
+        "entry": "DropShelfBarWidget.qml"
+      }
+    ],
     "contextMenuItems": [
       {
         "id": "shelf",
