@@ -231,8 +231,6 @@ Item {
             implicitWidth: root.windowWidth
             implicitHeight: root.windowHeight
 
-            Keys.onEscapePressed: if (root.closeOnEscape) root.open = false
-
             // Click-outside needs a surface covering the screen, which is a real cost, so it
             // exists only when asked for.
             HoverHandler {
@@ -245,7 +243,9 @@ Item {
                 radius: Appearance.rounding.normal
                 color: Theme.solid
                 border.width: 1
-                border.color: Theme.outlineFaint
+                border.color: Theme.fade(Theme.outline, 0.25)
+                focus: true
+                Keys.onEscapePressed: if (root.closeOnEscape) root.open = false
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -320,7 +320,7 @@ Item {
                             anchors.bottom: parent.bottom
                             width: parent.width
                             height: 1
-                            color: Theme.outlineFaint
+                            color: Theme.fade(Theme.outline, 0.25)
                         }
                     }
 
