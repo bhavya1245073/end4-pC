@@ -1574,6 +1574,14 @@
             "name": "scrolled",
             "args": "int up",
             "doc": "`up` is +1."
+          },
+          {
+            "kind": "property",
+            "name": "popupTakesClick",
+            "type": "bool",
+            "readonly": true,
+            "default": "popupLoader.item?.dismiss === \"manual\"",
+            "doc": "A popup with `dismiss: \"manual\"` opens on click and stays until dismissed, so the click has to reach it. Hover popups are unaffected, and a widget that handles its own clicks keeps"
           }
         ]
       },
@@ -2787,7 +2795,7 @@
             "name": "title",
             "type": "string",
             "default": "\"\"",
-            "doc": "Set by PluginBarWidget. Any Item with `containsMouse` works. (declared by StyledPopup) Optional header."
+            "doc": "Put anything clickable behind \"popup\" or \"manual\". With \"pill\" the window is destroyed while the pointer is still on its way to the popup, so a button in it cannot be reached - whi"
           },
           {
             "kind": "property",
@@ -9819,6 +9827,9 @@
         "properties": {
           "hoverTarget": "Item",
           "popupBackgroundMargin": "real",
+          "dismiss": "string",
+          "hoverDriven": "bool",
+          "open": "bool",
           "barVertical": "bool",
           "barEdge": "string",
           "barThickness": "real"

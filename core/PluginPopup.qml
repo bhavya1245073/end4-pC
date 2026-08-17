@@ -33,6 +33,17 @@ StyledPopup {
     // Set by PluginBarWidget. Any Item with `containsMouse` works.
     // (declared by StyledPopup)
 
+    // When it closes - `dismiss` from StyledPopup, restated here because it is the one property a
+    // plugin author has to think about:
+    //
+    //     dismiss: "pill"    (default) gone as soon as the pointer leaves the bar widget
+    //     dismiss: "popup"   stays while the pointer is on the widget or on the popup
+    //     dismiss: "manual"  stays until close() once the pointer has reached it
+    //
+    // Put anything clickable behind "popup" or "manual". With "pill" the window is destroyed while
+    // the pointer is still on its way to the popup, so a button in it cannot be reached - which is
+    // exactly what happened to the first popups that had buttons.
+
     // Optional header.
     property string title: ""
     property string subtitle: ""

@@ -346,6 +346,25 @@ popup: Component {
 }
 ```
 
+**A popup with anything clickable in it must set `dismiss: "manual"`.** The default,
+`"pill"`, closes the popup as soon as the pointer leaves the bar widget — and since
+the popup is a separate Wayland surface, the pointer has to leave the widget to reach
+it, so a button in it can never be clicked.
+
+```qml
+PluginPopup {
+    dismiss: "manual"     // click to open, stays until click-outside or Escape
+    PluginCard { interactive: true; onClicked: act() }
+}
+```
+
+Do not try to fix `"pill"` by also tracking hover on the popup. That trades "closes
+too early" for "stuck on screen", because it depends on a pointer-leave event
+arriving for a surface that maps and unmaps under the cursor, and when one is missed
+there is nothing left to close the popup. `"manual"` covers the screen with a
+transparent catcher instead: the card takes clicks, everything else closes it, and no
+part of it is a race.
+
 ### `PluginRow`, `PluginCard`, `PluginSeparator`
 
 `PluginRow` — label left, value right, correct emphasis, value stays flush. Use

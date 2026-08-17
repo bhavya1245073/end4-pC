@@ -155,6 +155,7 @@ Item {
     // StyledPopup is a LazyLoader keyed on its hoverTarget, so it already builds
     // nothing until first hover. This only has to hand it something to watch.
     Loader {
+        id: popupLoader
         active: root.popup !== null
         sourceComponent: root.popup
 
@@ -162,5 +163,15 @@ Item {
             if (item && item.hasOwnProperty("hoverTarget"))
                 item.hoverTarget = mouse;
         }
+    }
+
+    // A popup with `dismiss: "manual"` opens on click and stays until dismissed, so the click has to
+    // reach it. Hover popups are unaffected, and a widget that handles its own clicks keeps them:
+    // this only fires for a popup that asked for click-to-open.
+    readonly property bool popupTakesClick: popupLoader.item?.dismiss === "manual"
+
+    onClicked: {
+        if (root.popupTakesClick)
+            popupLoader.item.toggle();
     }
 }

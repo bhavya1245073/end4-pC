@@ -694,6 +694,41 @@ popup: Component {
 
 Leave `title`/`subtitle`/`icon` out for a bare panel with just your content.
 
+#### If the popup has anything clickable in it, set `dismiss: "manual"`
+
+```qml
+popup: Component {
+    PluginPopup {
+        dismiss: "manual"        // opens on click, stays until dismissed
+
+        PluginCard {
+            interactive: true
+            onClicked: doTheThing()
+            StyledText { text: qsTr("Do the thing") }
+        }
+    }
+}
+```
+
+| `dismiss` | Behaviour |
+| --- | --- |
+| `"pill"` (default) | Open while the pointer is on the bar widget; gone the moment it leaves. For read-only panels: a clock, a chart, a weather summary. |
+| `"manual"` | Opens when the bar widget is clicked, and stays until the user clicks the widget again, clicks anywhere else, or presses Escape. |
+
+A popup is its own Wayland surface, and the pointer has to leave the bar widget to
+reach it. With `"pill"` that means the window is destroyed while the pointer is
+still on its way, so a button inside can never be clicked. It is not a timing
+problem to be tuned away: keeping the popup alive by also tracking hover *on the
+popup* trades "closes too early" for "stays open forever" the first time a
+pointer-leave event goes missing for a surface that maps and unmaps under the
+cursor — which is exactly what happens in practice.
+
+Clicking has neither failure mode. With `dismiss: "manual"` the popup's window
+covers the screen with a transparent catcher, so the card takes clicks normally and
+anything outside it closes the popup — one surface, no hover, no race.
+
+`close()` and `toggle()` are available if you want to drive it yourself.
+
 ### PluginRow, PluginCard, PluginSeparator
 
 The three layouts every status panel re-invents, and the three most often got
