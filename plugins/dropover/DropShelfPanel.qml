@@ -267,11 +267,10 @@ PanelWindow {
 
                         width: 110
                         height: 120
-
                         path: modelData
 
                         onClicked: {
-                            Qt.openUrlExternally("file://" + cardDelegate.path);
+                            // Single click focuses / activates card without aggressively opening external app
                         }
 
                         Rectangle {
@@ -338,8 +337,9 @@ PanelWindow {
                                 }
                             }
 
-                            // Remove Item Button (hover badge)
+                            // Remove Item Button (hover badge with isolated MouseArea)
                             Rectangle {
+                                id: removeBtn
                                 visible: cardHover.containsMouse
                                 anchors.top: parent.top
                                 anchors.right: parent.right
@@ -347,21 +347,28 @@ PanelWindow {
                                 width: 22
                                 height: 22
                                 radius: 11
-                                color: Theme.solid
+                                color: removeMouse.containsPress ? Theme.error : (removeMouse.containsMouse ? Theme.accentBlock : Theme.solid)
                                 border.width: 1
                                 border.color: Theme.outlineDim
-                                z: 10
+                                z: 100
 
                                 MaterialSymbol {
                                     anchors.centerIn: parent
                                     text: "close"
                                     iconSize: 12
-                                    color: removeTap.pressed ? Theme.error : Theme.textDim
+                                    color: removeMouse.containsPress ? "#ffffff" : (removeMouse.containsMouse ? Theme.error : Theme.textDim)
                                 }
 
-                                TapHandler {
-                                    id: removeTap
-                                    onTapped: {
+                                MouseArea {
+                                    id: removeMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    propagateComposedEvents: false
+                                    preventStealing: true
+
+                                    onClicked: mouse => {
+                                        mouse.accepted = true;
                                         DropShelfState.items = DropShelfState.items.filter((_, i) => i !== cardDelegate.index);
                                         if (DropShelfState.items.length === 0) {
                                             DropShelfState.hide();
