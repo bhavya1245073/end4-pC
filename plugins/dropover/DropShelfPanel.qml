@@ -106,26 +106,23 @@ PanelWindow {
                 Layout.fillWidth: true
                 implicitHeight: headerRow.implicitHeight
 
-                // Drag handle area for moving the window across the screen
-                MouseArea {
+                DragHandler {
                     id: windowDragHandle
-                    anchors.fill: parent
-                    cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
+                    target: null
                     property real startX: 0
                     property real startY: 0
 
-                    onPressed: (mouse) => {
-                        startX = mouse.x;
-                        startY = mouse.y;
+                    onActiveChanged: {
+                        if (active) {
+                            startX = shelfRoot.posX;
+                            startY = shelfRoot.posY;
+                        }
                     }
 
-                    onPositionChanged: (mouse) => {
-                        if (!pressed) return;
-                        var dx = mouse.x - startX;
-                        var dy = mouse.y - startY;
-                        shelfRoot.posX = Math.max(10, Math.min(Screen.width - shelfRoot.width - 10, shelfRoot.posX + dx));
-                        shelfRoot.posY = Math.max(10, Math.min(Screen.height - shelfRoot.height - 10, shelfRoot.posY + dy));
+                    onTranslationChanged: {
+                        if (!active) return;
+                        shelfRoot.posX = Math.max(10, Math.min(Screen.width - shelfRoot.implicitWidth - 10, startX + translation.x));
+                        shelfRoot.posY = Math.max(10, Math.min(Screen.height - shelfRoot.implicitHeight - 10, startY + translation.y));
                     }
                 }
 
