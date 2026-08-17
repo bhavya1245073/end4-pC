@@ -26,6 +26,7 @@ import Quickshell.Io
 import Quickshell.Services.Pipewire
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 
 Singleton {
     id: root

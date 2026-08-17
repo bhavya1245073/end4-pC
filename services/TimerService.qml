@@ -7,6 +7,7 @@ import qs.modules.common
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import qs.core
 
 /**
  * Simple Pomodoro time manager.
@@ -63,7 +64,7 @@ Singleton {
                 notificationMessage = Translation.tr(`🔴 Focus: %1 minutes`).arg(Math.floor(focusTime / 60));
             }
 
-            Quickshell.execDetached(["notify-send", "Pomodoro", notificationMessage, "-a", "Shell"]);
+            PluginUtils.notify("Pomodoro", notificationMessage);
             if (Config.options.sounds.pomodoro) {
                 Audio.playSystemSound("alarm-clock-elapsed")
             }

@@ -5,6 +5,7 @@ import qs.modules.common
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.core
 
 Singleton {
     id: root
@@ -54,7 +55,7 @@ Singleton {
             }
             musicReconizedProc.running = true
         } catch(e) {
-            Quickshell.execDetached(["notify-send", Translation.tr("Couldn't recognize music"), Translation.tr("Perhaps what you're listening to is too niche"), "-a", "Shell"])
+            PluginUtils.notify(Translation.tr("Couldn't recognize music"), Translation.tr("Perhaps what you're listening to is too niche"))
         }
     }
 
@@ -73,7 +74,7 @@ Singleton {
         }
         onExited: (exitCode, exitStatus) => {
             if (exitCode === 1) {
-                Quickshell.execDetached(["notify-send", Translation.tr("Couldn't recognize music"), Translation.tr("Make sure you have songrec installed"), "-a", "Shell"])
+                PluginUtils.notify(Translation.tr("Couldn't recognize music"), Translation.tr("Make sure you have songrec installed"))
             }
         }
     }

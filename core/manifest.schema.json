@@ -166,6 +166,12 @@
           "items": {
             "$ref": "#/definitions/shortcut"
           }
+        },
+        "sidebarTabs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sidebarTab"
+          }
         }
       }
     },
@@ -759,6 +765,42 @@
         "args": {
           "type": "object",
           "description": "Passed to PanelRegistry.open and readable as PanelRegistry.state(id).args."
+        }
+      }
+    },
+    "sidebarTab": {
+      "type": "object",
+      "required": [
+        "id",
+        "entry"
+      ],
+      "additionalProperties": false,
+      "description": "A tab in the left sidebar, with a full-height page of its own.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string",
+          "description": "Shown in the tab strip."
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "order": {
+          "type": "integer",
+          "default": 50,
+          "description": "The shell own tabs sit at 10 (Intelligence), 20 (Translator), 30 (Media) and 40 (Anime)."
+        },
+        "requires": {
+          "type": "string",
+          "description": "Dotted path into the shell config; the tab is hidden when the value is falsy, e.g. \"sidebar.translator.enable\"."
+        },
+        "requiresValue": {
+          "description": "Require an exact value rather than truthiness."
         }
       }
     }

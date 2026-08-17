@@ -1,3 +1,4 @@
+import qs.core
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
@@ -7,26 +8,27 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Qt.labs.synchronizer
 
+// The left sidebar's tabs come from SidebarTabRegistry - the shell's four and any a plugin
+// contributes, in one list.
+//
+// This file used to hold two parallel arrays: a list of tab buttons and a list of page Components,
+// each with its own copy of the config conditions, kept in the same order by hand. Adding a tab
+// meant editing both, and a plugin could not add one at all. Now there is one list and one delegate,
+// and a page is a URL - including the shell's own, which is what makes a plugin's tab
+// indistinguishable from a built-in one.
+
 Item {
     id: root
     required property var scopeRoot
     property int sidebarPadding: 10
     anchors.fill: parent
-    property bool aiChatEnabled: Config.options.policies.ai !== 0
-    property bool translatorEnabled: Config.options.sidebar.translator.enable
-    property bool animeEnabled: Config.options.policies.weeb !== 0
-    property bool animeCloset: Config.options.policies.weeb === 2
-    property bool mediaEnabled: Config.options.sidebar.media.enable
-    property var tabButtonList: [
-        ...(root.aiChatEnabled ? [{"icon": "neurology", "name": Translation.tr("Intelligence")}] : []),
-        ...(root.translatorEnabled ? [{"icon": "translate", "name": Translation.tr("Translator")}] : []),
-        ...(root.mediaEnabled ? [{"icon": "music_note", "name": Translation.tr("Media")}] : []),
-        ...((root.animeEnabled && !root.animeCloset) ? [{"icon": "bookmark_heart", "name": Translation.tr("Anime")}] : [])
-    ]
+
+    readonly property var tabs: SidebarTabRegistry.all
+    readonly property var tabButtonList: SidebarTabRegistry.buttons
     property int tabCount: swipeView.count
 
     function focusActiveItem() {
-        swipeView.currentItem.forceActiveFocus()
+        swipeView.currentItem?.forceActiveFocus();
     }
 
     Keys.onPressed: (event) => {
@@ -51,7 +53,7 @@ Item {
 
         VerticalTabBar {
             id: verticalTabBar
-            visible: tabButtonList.length > 0
+            visible: root.tabButtonList.length > 0
             Layout.fillWidth: true
             tabButtonList: root.tabButtonList
             currentIndex: swipeView.currentIndex
@@ -73,7 +75,6 @@ Item {
                 id: swipeView
                 anchors.fill: parent
                 spacing: 10
-                currentIndex: tabBar.currentIndex
 
                 clip: true
                 layer.enabled: true
@@ -85,38 +86,45 @@ Item {
                     }
                 }
 
-                contentChildren: [
-                    ...(root.aiChatEnabled ? [aiChat.createObject()] : []),
-                    ...(root.translatorEnabled ? [translator.createObject()] : []),
-                    ...(root.mediaEnabled ? [media.createObject()] : []),
-                    ...((root.tabButtonList.length === 0 || (!root.aiChatEnabled && !root.translatorEnabled && root.animeCloset)) ? [placeholder.createObject()] : []),
-                    ...(root.animeEnabled ? [anime.createObject()] : []),
-                ]
-            }
-        }
+                Repeater {
+                    model: root.tabs
 
-        Component {
-            id: aiChat
-            AiChat {}
-        }
-        Component {
-            id: translator
-            Translator {}
-        }
-        Component {
-            id: media
-            SidebarPlayerControl {}
-        }
-        Component {
-            id: anime
-            Anime {}
-        }
-        Component {
-            id: placeholder
-            Item {
+                    // A page per row, loaded from its URL and only once it has been shown:
+                    // the AI tab and the anime tab are both expensive, and a sidebar that
+                    // loads every tab on open pays for all of them to show one.
+                    delegate: Loader {
+                        required property var modelData
+                        required property int index
+
+                        active: SwipeView.isCurrentItem || SwipeView.isNextItem || SwipeView.isPreviousItem
+                        asynchronous: true
+                        source: modelData.url
+
+                        onStatusChanged: {
+                            if (status === Loader.Error)
+                                console.warn(`[sidebar] could not load tab ${modelData.id} from ${modelData.url}`);
+                        }
+                    }
+                }
+            }
+
+            // Shown instead of the pages when every tab is switched off, so an empty sidebar says
+            // so rather than looking broken.
+            ColumnLayout {
+                anchors.centerIn: parent
+                visible: root.tabs.length === 0
+                spacing: Theme.pad.s
+
+                MaterialSymbol {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: "widgets"
+                    iconSize: Theme.font.xl * 1.5
+                    color: Theme.textFaint
+                }
+
                 StyledText {
-                    anchors.centerIn: parent
-                    text: root.animeCloset ? Translation.tr("Nothing") : Translation.tr("Enjoy your empty sidebar...")
+                    Layout.alignment: Qt.AlignHCenter
+                    text: Translation.tr("Enjoy your empty sidebar...")
                     color: Appearance.colors.colSubtext
                 }
             }

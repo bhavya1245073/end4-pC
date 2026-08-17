@@ -112,6 +112,7 @@ Singleton {
     readonly property var searchProviders: root.collect("searchProviders")
     readonly property var contextMenuItems: root.collect("contextMenuItems")
     readonly property var osdIndicators: root.collect("osdIndicators")
+    readonly property var sidebarTabs: root.collect("sidebarTabs")
 
     // The same lists over *installed* plugins, enabled or not.
     //
@@ -132,6 +133,7 @@ Singleton {
     readonly property var installedSearchProviders: root.collectInstalled("searchProviders")
     readonly property var installedContextMenuItems: root.collectInstalled("contextMenuItems")
     readonly property var installedOsdIndicators: root.collectInstalled("osdIndicators")
+    readonly property var installedSidebarTabs: root.collectInstalled("sidebarTabs")
 
     // Same memo as `collect`, over installed plugins rather than active ones. Keyed on
     // the plugin table, which changes only when a plugin appears or disappears on disk -

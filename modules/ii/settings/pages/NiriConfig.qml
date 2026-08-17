@@ -7,6 +7,7 @@ import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.models.niri
+import qs.core
 
 ContentPage {
     id: page
@@ -681,6 +682,13 @@ rm -f "$tmp"`]
                     }
                 }
             }
+        }
+
+        // Anything a plugin contributes to this page. Every settings page hosts one of
+        // these, so a plugin can put its controls where they belong rather than in a
+        // page of its own that nobody looks at.
+        PluginSections {
+            page: "Niri"
         }
     }
 }

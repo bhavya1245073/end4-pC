@@ -77,6 +77,11 @@
         "kind": "shortcuts",
         "description": "",
         "ref": "#/definitions/shortcut"
+      },
+      {
+        "kind": "sidebarTabs",
+        "description": "",
+        "ref": "#/definitions/sidebarTab"
       }
     ],
     "settingTypes": [
@@ -693,6 +698,57 @@
           "args": {
             "type": "object",
             "description": "Passed to PanelRegistry.open and readable as PanelRegistry.state(id).args.",
+            "default": null,
+            "enum": null
+          }
+        }
+      },
+      "sidebarTab": {
+        "description": "A tab in the left sidebar, with a full-height page of its own.",
+        "required": [
+          "id",
+          "entry"
+        ],
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "label": {
+            "type": "string",
+            "description": "Shown in the tab strip.",
+            "default": null,
+            "enum": null
+          },
+          "icon": {
+            "type": "#/definitions/materialSymbol",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "entry": {
+            "type": "#/definitions/qmlFile",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "order": {
+            "type": "integer",
+            "description": "The shell own tabs sit at 10 (Intelligence), 20 (Translator), 30 (Media) and 40 (Anime).",
+            "default": 50,
+            "enum": null
+          },
+          "requires": {
+            "type": "string",
+            "description": "Dotted path into the shell config; the tab is hidden when the value is falsy, e.g. \"sidebar.translator.enable\".",
+            "default": null,
+            "enum": null
+          },
+          "requiresValue": {
+            "type": "any",
+            "description": "Require an exact value rather than truthiness.",
             "default": null,
             "enum": null
           }
@@ -6029,6 +6085,13 @@
           },
           {
             "kind": "property",
+            "name": "sidebarTabs",
+            "type": "var",
+            "readonly": true,
+            "default": "root.collect(\"sidebarTabs\")"
+          },
+          {
+            "kind": "property",
             "name": "installedPanels",
             "type": "var",
             "readonly": true,
@@ -6097,6 +6160,13 @@
             "type": "var",
             "readonly": true,
             "default": "root.collectInstalled(\"osdIndicators\")"
+          },
+          {
+            "kind": "property",
+            "name": "installedSidebarTabs",
+            "type": "var",
+            "readonly": true,
+            "default": "root.collectInstalled(\"sidebarTabs\")"
           },
           {
             "kind": "function",
@@ -6733,6 +6803,20 @@
             "name": "truncate",
             "args": "text: string, limit: int",
             "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "copyFile",
+            "args": "path: string, mimeType: string",
+            "returns": "void",
+            "doc": "This is the safe way to use a shell when a shell is genuinely needed: the script text is fixed, and the path arrives as `$1`. Nothing is interpolated, so a filename containing a qu"
+          },
+          {
+            "kind": "function",
+            "name": "pipe",
+            "args": "command: var, input: string, callback: var",
+            "returns": "void",
+            "doc": "This is what replaces `bash -c \"printf '...' | thing\"`, and the difference is not style: the shell form has to quote the payload, and a clipboard entry is precisely the kind of tex"
           }
         ]
       },
@@ -6961,6 +7045,49 @@
             "name": "menuFor",
             "args": "id: string",
             "returns": "string"
+          }
+        ]
+      },
+      {
+        "name": "SidebarTabRegistry",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Tabs in the left sidebar, the shell's own and plugins' alike.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "builtins",
+            "type": "var",
+            "readonly": true,
+            "default": "["
+          },
+          {
+            "kind": "property",
+            "name": "all",
+            "type": "var",
+            "readonly": true,
+            "default": "Stable.list(\"SidebarTabRegistry.all\", (() =>"
+          },
+          {
+            "kind": "property",
+            "name": "buttons",
+            "type": "var",
+            "readonly": true,
+            "default": "root.all.map(tab => ({ icon: tab.icon, name: tab.label }))",
+            "doc": "What the tab strip needs: an icon and a name per tab."
+          },
+          {
+            "kind": "property",
+            "name": "ids",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "function",
+            "name": "indexOf",
+            "args": "id: string",
+            "returns": "int"
           }
         ]
       },

@@ -266,6 +266,60 @@ Singleton {
         return str.slice(0, limit - 1).replace(/\s+$/, "") + "…";
     }
 
+    // Put a file's contents on the clipboard with a MIME type - a screenshot, an SVG, a PDF.
+    //
+    //     PluginUtils.copyFile("/tmp/shot.png", "image/png")
+    //
+    // This is the safe way to use a shell when a shell is genuinely needed: the script text is
+    // fixed, and the path arrives as `$1`. Nothing is interpolated, so a filename containing a
+    // quote, a space or `$(rm -rf ~)` is just a filename.
+    function copyFile(path: string, mimeType: string): void {
+        Quickshell.execDetached(["sh", "-c", 'exec wl-copy --type "$1" < "$2"', "sh", mimeType ?? "application/octet-stream", path ?? ""]);
+    }
+
+    // Feeds `input` to a command's stdin and hands back its output:
+    //
+    //     PluginUtils.pipe(["cliphist", "decode"], entry, (stdout, code) => PluginUtils.copy(stdout))
+    //
+    // This is what replaces `bash -c "printf '...' | thing"`, and the difference is not style: the
+    // shell form has to quote the payload, and a clipboard entry is precisely the kind of text that
+    // contains quotes, newlines, backticks and dollar signs. Nothing is quoted here because nothing
+    // is parsed - the bytes go down a pipe.
+    function pipe(command: var, input: string, callback: var): void {
+        if (!Array.isArray(command) || command.length === 0) {
+            console.warn("[PluginUtils] pipe needs a non-empty list");
+            return;
+        }
+        const proc = root.__pipeComponent.createObject(root, {
+            command: command.map(part => String(part)),
+            payload: input ?? "",
+            handler: callback ?? null
+        });
+        proc.running = true;
+    }
+
+    readonly property Component __pipeComponent: Component {
+        Process {
+            id: piped
+            property string payload: ""
+            property var handler: null
+            stdinEnabled: true
+            stdout: StdioCollector {}
+            stderr: StdioCollector {}
+            onStarted: {
+                piped.write(piped.payload);
+                // Closing stdin is what tells the child there is no more input; without it a
+                // filter like `decode` or `jq` waits forever and the callback never runs.
+                piped.stdinEnabled = false;
+            }
+            onExited: (exitCode, _status) => {
+                if (piped.handler)
+                    piped.handler(piped.stdout.text, exitCode, piped.stderr.text);
+                piped.destroy();
+            }
+        }
+    }
+
     readonly property Component __processComponent: Component {
         Process {
             id: proc

@@ -204,7 +204,7 @@ Singleton {
             execute: args => {
                 if (!/^(\d+)/.test(args.trim())) {
                     // Invalid if doesn't start with numbers
-                    Quickshell.execDetached(["notify-send", Translation.tr("Superpaste"), Translation.tr("Usage: <tt>%1superpaste NUM_OF_ENTRIES[i]</tt>\nSupply <tt>i</tt> when you want images\nExamples:\n<tt>%1superpaste 4i</tt> for the last 4 images\n<tt>%1superpaste 7</tt> for the last 7 entries").arg(Config.options.search.prefix.action), "-a", "Shell"]);
+                    PluginUtils.notify(Translation.tr("Superpaste"), Translation.tr("Usage: <tt>%1superpaste NUM_OF_ENTRIES[i]</tt>\nSupply <tt>i</tt> when you want images\nExamples:\n<tt>%1superpaste 4i</tt> for the last 4 images\n<tt>%1superpaste 7</tt> for the last 7 entries").arg(Config.options.search.prefix.action));
                     return;
                 }
                 const syntaxMatch = /^(?:(\d+)(i)?)/.exec(args.trim());
@@ -235,33 +235,33 @@ Singleton {
             action: "unsplash",
             execute: args => {
                 if (!args || args.trim().length === 0) {
-                    Quickshell.execDetached(["notify-send", "Unsplash", Translation.tr("Usage: /unsplash YOUR_API_KEY"), "-a", "Shell"]);
+                    PluginUtils.notify("Unsplash", Translation.tr("Usage: /unsplash YOUR_API_KEY"));
                     return;
                 }
                 KeyringStorage.setNestedField(["apiKeys", "unsplash"], args.trim());
-                Quickshell.execDetached(["notify-send", "Unsplash", Translation.tr("API key saved!"), "-a", "Shell"]);
+                PluginUtils.notify("Unsplash", Translation.tr("API key saved!"));
             }
         },
         {
             action: "wallhaven",
             execute: args => {
                 if (!args || args.trim().length === 0) {
-                    Quickshell.execDetached(["notify-send", "Wallhaven", Translation.tr("Usage: /wallhaven YOUR_API_KEY"), "-a", "Shell"]);
+                    PluginUtils.notify("Wallhaven", Translation.tr("Usage: /wallhaven YOUR_API_KEY"));
                     return;
                 }
                 KeyringStorage.setNestedField(["apiKeys", "wallhaven"], args.trim());
-                Quickshell.execDetached(["notify-send", "Wallhaven", Translation.tr("API key saved!"), "-a", "Shell"]);
+                PluginUtils.notify("Wallhaven", Translation.tr("API key saved!"));
             }
         },
         {
             action: "pexels",
             execute: args => {
                 if (!args || args.trim().length === 0) {
-                    Quickshell.execDetached(["notify-send", "Pexels", Translation.tr("Usage: /pexels YOUR_API_KEY"), "-a", "Shell"]);
+                    PluginUtils.notify("Pexels", Translation.tr("Usage: /pexels YOUR_API_KEY"));
                     return;
                 }
                 KeyringStorage.setNestedField(["apiKeys", "pexels"], args.trim());
-                Quickshell.execDetached(["notify-send", "Pexels", Translation.tr("API key saved!"), "-a", "Shell"]);
+                PluginUtils.notify("Pexels", Translation.tr("API key saved!"));
             }
         },
     ]

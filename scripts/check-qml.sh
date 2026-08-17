@@ -376,13 +376,27 @@ check_singleton_imports() {
 }
 
 if [[ "$*" == "." ]]; then
-    check_singleton_imports "./core" "qs.core"
-    check_singleton_imports "./services" "qs.services"
+    # Every directory that holds singletons, not just core and services. `FileUtils.trimFileProtocol`
+    # in a file that imports qs.modules.common but not qs.modules.common.functions compiles fine and
+    # fails at runtime with "FileUtils is not defined" - and it shipped exactly that way in
+    # core/PluginAudio.qml, which is what widened this check.
+    #
+    # A directory is a QML module iff its name maps to a `qs.*` import path, which for this tree is
+    # the path with slashes turned into dots.
+    while IFS= read -r directory; do
+        module="qs$(printf '%s' "${directory#.}" | tr '/' '.')"
+        check_singleton_imports "$directory" "$module"
+    done < <(
+        grep -rl '^pragma Singleton' --include='*.qml' . \
+            | xargs -r -n1 dirname \
+            | sort -u \
+            | grep -v '^\.$'
+    )
 
     if (( missing )); then
         status=1
     else
-        echo "==> Singleton imports: all $(( $(ls ./core/*.qml ./services/*.qml 2>/dev/null | wc -l) )) candidates resolve"
+        echo "==> Singleton imports: all $(grep -rl '^pragma Singleton' --include='*.qml' . | wc -l) candidates resolve"
     fi
 fi
 
