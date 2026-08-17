@@ -13,6 +13,7 @@ Item {
     property bool vertical: Config.options.bar.vertical
     property bool isMaterial: Config.options.bar.cornerStyle === 3
     property bool mirrored: false
+    readonly property bool acceptsMirroring: true
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property bool isPlaying: activePlayer?.isPlaying ?? false
     // Declaring a PluginSpectrum is what starts the analyser, and destroying this widget stops it:

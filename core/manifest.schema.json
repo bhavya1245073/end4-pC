@@ -110,7 +110,7 @@
         "panels": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/entryOnly"
+            "$ref": "#/definitions/panel"
           }
         },
         "services": {
@@ -801,6 +801,31 @@
         },
         "requiresValue": {
           "description": "Require an exact value rather than truthiness."
+        }
+      }
+    },
+    "panel": {
+      "type": "object",
+      "required": [
+        "id",
+        "entry"
+      ],
+      "additionalProperties": false,
+      "description": "A window the shell can open, addressable through PanelRegistry.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "entry": {
+          "$ref": "#/definitions/qmlFile"
+        },
+        "label": {
+          "type": "string",
+          "description": "Shown by `ipc call panels list` and in the settings GUI."
+        },
+        "group": {
+          "type": "string",
+          "description": "Panels sharing a group close each other. \"overlay\" also means full-screen, which the bar and hot corners take into account."
         }
       }
     }

@@ -760,4 +760,101 @@ if [[ $# -eq 0 || "$*" == "." ]]; then
     fi
 fi
 
+
+# ---------------------------------------------------------------------------- phase 10
+# Run the shell, open everything, and read the log.
+#
+# Every phase above is static, and there is a whole class of bug none of them can see: a name that
+# resolves at compile time and is undefined at run time. Two shipped this way.
+#
+#   ReferenceError: filterDuplicatePlayers is not defined
+#       - the right sidebar called a function that lived in the media-controls plugin. The sidebar's
+#         player list silently became undefined. Compiles perfectly.
+#
+#   TypeError: Cannot assign to read-only property "mirrored"
+#       - the bar guarded the assignment with hasOwnProperty, which is also true for a read-only
+#         property, and every Control has a read-only `mirrored`. The exception aborted the rest of
+#         the handler on every widget load.
+#
+# So: launch the real shell against a scratch state directory, open every panel the registry knows
+# about, and fail on any ReferenceError, TypeError, or QML warning. This is the only phase that
+# needs a compositor, so it is skipped without one.
+
+if [[ ( $# -eq 0 || "$*" == "." ) && -n "${WAYLAND_DISPLAY:-}" && "${CHECK_SKIP_RUNTIME:-0}" != "1" ]]; then
+    echo "==> Runtime: opening every panel and reading the log..."
+
+    runtime_dir="$(mktemp -d)"
+    runtime_log="$runtime_dir/shell.log"
+    # A scratch config, so a probe that toggles a plugin or moves a widget cannot touch the real one.
+    scratch_state="$runtime_dir/state"
+    mkdir -p "$scratch_state"
+    [[ -f "$HOME/.config/illogical-impulse/config.json" ]] && cp -r "$HOME/.config/illogical-impulse" "$scratch_state/illogical-impulse"
+
+    # The config link has to live under the scratch XDG_CONFIG_HOME, because that is where the shell
+    # being launched will look for it.
+    runtime_config="$scratch_state/quickshell/__check_runtime"
+    mkdir -p "$(dirname "$runtime_config")"
+    ln -sfn "$ROOT" "$runtime_config"
+
+    XDG_CONFIG_HOME="$scratch_state" \
+        qs -c __check_runtime >"$runtime_log" 2>&1 &
+    runtime_pid=$!
+
+    runtime_ready=0
+    for _ in $(seq 1 40); do
+        sleep 1
+        if XDG_CONFIG_HOME="$scratch_state" qs -c __check_runtime ipc call panels list >/dev/null 2>&1; then
+            runtime_ready=1
+            break
+        fi
+        kill -0 "$runtime_pid" 2>/dev/null || break
+    done
+
+    if (( runtime_ready )); then
+        # Every panel, one at a time, then closed again. Opening a panel is what instantiates its
+        # content, and content that is never instantiated is content that is never checked.
+        while read -r panel; do
+            [[ -n "$panel" ]] || continue
+            XDG_CONFIG_HOME="$scratch_state" qs -c __check_runtime ipc call panels open "$panel" >/dev/null 2>&1
+            sleep 0.6
+            XDG_CONFIG_HOME="$scratch_state" qs -c __check_runtime ipc call panels close "$panel" >/dev/null 2>&1
+        done < <(
+            XDG_CONFIG_HOME="$scratch_state" qs -c __check_runtime ipc call panels list 2>/dev/null \
+                | awk '{ print $2 }' | grep -vx bar
+        )
+
+        # And the settings window, which is where plugin settings pages and sections are built.
+        XDG_CONFIG_HOME="$scratch_state" qs -c __check_runtime ipc call panels open settings >/dev/null 2>&1
+        sleep 2
+        sleep 1
+    fi
+
+    kill "$runtime_pid" 2>/dev/null
+    wait "$runtime_pid" 2>/dev/null
+
+    if (( ! runtime_ready )); then
+        echo "    FAIL the shell did not come up"
+        sed 's/\x1b\[[0-9;]*m//g' "$runtime_log" | tail -20 | sed 's/^/    /'
+        status=1
+    else
+        # Anything that is a genuine defect. Missing icon themes and Qt's own layout gripes about
+        # files this tree does not own are noise; an undefined name never is.
+        runtime_problems="$(
+            sed 's/\x1b\[[0-9;]*m//g' "$runtime_log" \
+                | grep -E "ReferenceError|TypeError|is not a function|Unable to assign|Cannot assign|Binding loop|SyntaxError|Failed to load" \
+                | grep -vE "Could not load icon|Detected anchors on an item" \
+                | sort -u
+        )"
+        if [[ -n "$runtime_problems" ]]; then
+            echo "    Errors in the running shell:"
+            printf '%s\n' "$runtime_problems" | sed 's/^/    FAIL /'
+            status=1
+        else
+            echo "==> Runtime: no errors with every panel opened"
+        fi
+    fi
+
+    rm -rf "$runtime_dir"
+fi
+
 exit "$status"

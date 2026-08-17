@@ -91,7 +91,13 @@ Every `entry` is a path relative to the plugin folder.
                           "menu": "", "requires": "" } ],
     "shortcuts":      [ { "id": "toggleMyPanel", "description": "Toggle my panel",
                           "suggestedKey": "SUPER, M",
-                          "ipc": { "target": "myPanel", "function": "toggle" } } ]
+                          "ipc": { "target": "myPanel", "function": "toggle" } } ],
+    "searchProviders":[ { "id": "units", "entry": "UnitProvider.qml" } ],
+    "contextMenuItems":[{ "id": "notes", "label": "New note", "icon": "note_add",
+                          "order": 35, "panel": "notes" } ],
+    "osdIndicators": [ { "id": "coffee", "entry": "CoffeeOsd.qml" } ],
+    "sidebarTabs":    [ { "id": "tasks", "label": "Tasks", "icon": "checklist",
+                          "entry": "TasksTab.qml", "order": 45 } ]
 }
 ```
 
@@ -107,6 +113,10 @@ Every `entry` is a path relative to the plugin folder.
 | `quickToggles` | A tile in the sidebar's quick settings panel. Inherit `AndroidQuickToggleButton` and it works in both panel styles; supply `classicEntry` if you want a different file for the classic style. `menu` names a dialog its expand arrow opens (`wifi`, `bluetooth`, `nightLight`, `audioOutput`, `audioInput`); `requires` limits it to one compositor. Appears in the unused-toggle tray, draggable into the grid like any built-in. |
 | `shortcuts` | A keybind, registered as `quickshell:<id>`. Give it `exec` (argv array) or `ipc` (`{ target, function }`) and the shell handles it with no QML from you. `suggestedKey` is documentation, shown in the plugin's page under **Keybinds** and by `ipc call plugins shortcuts`; nothing binds a key for you. Omit both `exec` and `ipc` to declare a shortcut you handle yourself with `CompositorGlobalShortcut`. |
 | `ipc` | Commands on the shell's command line. Root type: `PluginIpc`. Every annotated function becomes `qs -c end4-pC ipc call <target> <function>`; `target` defaults to the plugin id. See below. |
+| `searchProviders` | Live results in the launcher, mixed in with apps and the shell's own answers. Root type: `PluginSearchProvider` - set `prefix` to claim a prefix like `=`, or leave it empty to answer every query. |
+| `contextMenuItems` | A row in the desktop right-click menu. Declarative: `panel` opens a panel, `ipc` calls a command, `exec` runs argv, `url` opens a link, `entry` names a submenu. `badge` names a `PluginBus` topic whose value is shown on the right. `$menuX`, `$menuY` and `$screen` are substituted, so a row can open something where the click happened. |
+| `osdIndicators` | An on-screen display of your own - the volume/brightness style overlay. `OsdRegistry.show("<plugin>:<id>")` raises it; the shell handles the timeout, the stacking and the animation. |
+| `sidebarTabs` | A full-height tab in the left sidebar, next to Intelligence, Translator, Media and Anime - which are rows in the same registry. `order` sorts it (the shell's are 10/20/30/40), `requires` gates it on a dotted config path. Pages load lazily, so a tab costs nothing until it is shown. |
 
 Ids must be unique across plugins for the same kind. A `barWidgets`,
 `desktopWidgets` or `quickToggles` entry that reuses a built-in id (`clockWidget`,
@@ -123,6 +133,10 @@ shell ships can be replaced, and anything a plugin adds is a first-class citizen
 | `core/BarWidgetRegistry.qml` | bar widgets: file, name, icon, pill preference, pill colour, repeatability |
 | `core/DesktopWidgetRegistry.qml` | desktop widgets: file, name, icon, and where the enabled flag is stored |
 | `core/QuickToggleRegistry.qml` | quick toggles: file per panel style, dialog, required compositor |
+| `core/PanelRegistry.qml` | every panel the shell can open, whether it is open, its arguments, and which panels are mutually exclusive |
+| `core/SidebarTabRegistry.qml` | left sidebar tabs, the shell's four included |
+| `core/ContextMenuRegistry.qml` | desktop right-click rows |
+| `core/OsdRegistry.qml` | on-screen displays |
 
 None of these are consulted by more than one host. If you find yourself adding a
 widget in two places, one of them is wrong.
@@ -367,6 +381,258 @@ and `bounce`.
 
 `Appearance` is still there for a role this does not cover. Reaching for it means
 opting out of the guarantee that light mode looks right.
+
+## System facades
+
+Everything below is a singleton in `qs.core`. They exist so a plugin never has to know
+that brightness is `brightnessctl` on one machine and DDC on another, that the CPU
+temperature lives in a different `hwmon` node on every laptop, or that "is the
+microphone in use" means walking Pipewire link groups. Read a property, call a
+function.
+
+They are also the answer to the most common way a plugin breaks: shelling out.
+`Quickshell.execDetached(["bash", "-c", "..."])` with anything user-supplied in the
+string is a command injection, costs a process per call, and gives you no result. If
+you find yourself writing one, the thing you want is probably already here.
+
+| Singleton | What it is | Some properties | Some functions |
+| --- | --- | --- | --- |
+| `ContextMenuRegistry` | Items in the desktop right-click menu, built-in and plugin alike. | `builtins`, `all` | `opensSubmenu`, `badgeValue`, `activate` |
+| `OsdRegistry` | Every OSD indicator the shell can show, built-in and plugin alike. | `builtins`, `current`, `builtinBase`, `all`, `ids` | `find`, `urlFor`, `show` |
+| `PanelRegistry` | Every panel the shell can open, and whether it is open. | `builtins`, `contributed`, `all`, `ids`, `states`, `revision` | `state`, `isOpen`, `groupOf`, `describe`, `open`, `close`, `toggle`, `set` |
+| `PluginApps` | Installed applications: find them, launch them, pin them. | `all`, `count`, `pinned`, `categories` | `byId`, `find`, `search`, `inCategory`, `launch`, `launchWith`, `open`, `isPinned` |
+| `PluginAudio` | Volume, per-app streams, and the audio spectrum. | `ready`, `sink`, `source`, `volume`, `muted`, `maxVolume` | `setVolume`, `changeVolume`, `setMuted`, `toggleMute`, `setInputVolume`, `toggleInputMute`, `playSound`, `acquireSpectrum` |
+| `PluginBluetooth` | Bluetooth adapters and devices. | `available`, `enabled`, `connected`, `connectedCount`, `scanning`, `adapterName` | `toggle`, `setEnabled`, `scan`, `connectTo`, `disconnectFrom` |
+| `PluginBus` | The event bus: how two plugins that have never heard of each other talk. | `topics`, `cellComponent` | `emit`, `publish`, `on`, `once`, `off`, `retained`, `value`, `has` |
+| `PluginCommands` | `qs -c end4-pC ipc call plugins ...` - the plugin system's own command line. |  |  |
+| `PluginConfig` | Per-plugin settings store. | `path`, `data`, `loaded`, `bags`, `bagKeys`, `emptyBag` | `of`, `value`, `set`, `reset`, `resetAll`, `setEnabled`, `widgetState`, `widgetValue` |
+| `PluginDialogs` | Modal dialogs, drawn by the shell rather than by another program. | `current`, `queue`, `open` | `confirm`, `prompt`, `choose`, `alert`, `resolve`, `cancel`, `openFile`, `saveFile` |
+| `PluginDisplay` | Screen brightness, gamma and night light. | `focusedMonitor`, `brightness`, `available`, `monitors`, `nightLight`, `gamma` | `setBrightness`, `step`, `increase`, `decrease`, `setBrightnessOn`, `setGamma` |
+| `PluginFs` | Files, without the ceremony. | `home`, `configDir`, `cacheDir`, `dataDir`, `stateDir`, `runtimeDir` | `expand`, `url`, `dirname`, `basename`, `extension`, `join`, `read`, `readJson` |
+| `PluginMedia` | Whatever is playing, whichever player it is in. | `player`, `available`, `isPlaying`, `title`, `artist`, `album` | `playPause`, `next`, `previous`, `play`, `pause`, `pauseAll`, `seek`, `seekFraction` |
+| `PluginNetwork` | Wi-Fi, ethernet, and VPNs. | `online`, `type`, `wifiEnabled`, `wifiScanning`, `connecting`, `ssid` | `toggleWifi`, `enableWifi`, `rescan`, `connect`, `disconnect`, `refreshVpns` |
+| `PluginNotifications` | Notifications: what arrived, what to do about it, and whether to be quiet. | `history`, `popups`, `count`, `unreadCount`, `hasAny`, `byApp` | `toggleDnd`, `setDnd`, `dismiss`, `clearAll`, `markAllRead`, `dismissPopups`, `invokeAction`, `send` |
+| `PluginPower` | Power actions, battery, and sleep inhibitors. | `hasBattery`, `percent`, `isCharging`, `isLow`, `isCritical`, `isPluggedIn` | `lock`, `suspend`, `hibernate`, `reboot`, `rebootToFirmware`, `powerOff`, `logout`, `inhibit` |
+| `PluginPrivacy` | Is anything using the microphone, the camera, or the screen right now. | `micInUse`, `screenSharing`, `micApps`, `screenApps`, `cameraInUse`, `cameraApps` | `refreshCamera` |
+| `PluginRegistry` | Plugin discovery and registry. | `apiVersion`, `minApiVersion`, `pluginPaths`, `userPluginsDir`, `pluginsDir`, `pluginDirs` | `collectInstalled`, `sectionsFor`, `collect`, `pluginsByName`, `collectFrom`, `resolve`, `dirOf`, `get` |
+| `PluginSearch` | Owns the live search providers plugins contribute, and aggregates their answers for the launcher. | `query`, `providerCount`, `results` | `run` |
+| `PluginStorage` | Persistent per-plugin state that is not a *setting*. | `stores`, `loaded`, `storeComponent` | `of` |
+| `PluginSystem` | Hardware telemetry, read from the kernel rather than parsed out of other programs. | `interval`, `diskInterval`, `paused`, `historyLength`, `cpu`, `memory` | `discover`, `refresh`, `refreshDisks` |
+| `PluginTimer` | Time, without a Timer per idea. | `stats`, `handleComponent` | `after`, `next`, `every`, `debounce`, `throttle`, `cron`, `at`, `stopAll` |
+| `PluginUtils` | Safe stand-ins for the things plugins otherwise shell out for. | `notifyAppName`, `fetchTimeout` | `copy`, `copyTyped`, `paste`, `notify`, `fetchJson`, `fetchText`, `exec`, `run` |
+| `PluginWM` | Windows, workspaces and monitors, without caring which compositor is running. | `compositor`, `supportsWorkspaces`, `toplevel`, `activeWindow`, `windows`, `workspaces` | `focusWorkspace`, `nextWorkspace`, `previousWorkspace`, `focusWindow`, `closeWindow`, `closeActive`, `moveWindowToWorkspace`, `moveActiveToWorkspace` |
+| `SidebarTabRegistry` | Tabs in the left sidebar, the shell's own and plugins' alike. | `builtins`, `all`, `buttons`, `ids` | `indexOf` |
+
+*(Generated from `core/api.json`; `scripts/api.sh <name>` prints any of them in full.)*
+
+### The ones you will reach for first
+
+```qml
+import qs.core
+
+PluginBarWidget {
+    pluginId: "vitals"
+    tooltip: qsTr("CPU %1% · %2°C").arg(Math.round(PluginSystem.cpu.usage * 100)).arg(PluginSystem.cpu.temperature)
+
+    PluginSparkline {
+        values: PluginSystem.cpu.history       // already a rolling window
+        color: Theme.accent
+    }
+}
+```
+
+`PluginSystem` polls `/proc` and `/sys` directly, once, for every plugin that asks -
+CPU (per-core, temperature, frequency, load averages), memory, swap, GPU load and
+VRAM, per-interface network rates, and mounted disks. Ten plugins reading it cost the
+same as one.
+
+`PluginUtils` is the small stuff you would otherwise shell out for: `copy`, `paste`,
+`notify`, `fetchJson`, `fetchText`, `exec`, `run` (argv with a callback for stdout),
+`pipe` (send a payload down stdin - the safe way to feed a program arbitrary text) and
+`copyFile` (a file on the clipboard with a MIME type).
+
+`PluginWM` is compositor-agnostic. `PluginWM.compositor` says which one is running,
+but `focusWorkspace(3)`, `closeActive()` and `moveActiveToWorkspace(2)` do the right
+thing on both, and `PluginWM.activeWindow` is one shape regardless.
+
+`PluginPower.inhibit("burning a disc")` holds a real `systemd-inhibit` and hands you a
+token to release. `PluginPrivacy.cameraInUse` is true when something has `/dev/video0`
+open, which Pipewire cannot tell you. `PluginAudio.acquireSpectrum()` is reference
+counted, so the FFT process runs while at least one widget wants it and stops when the
+last one goes away.
+
+## Panels
+
+Every window the shell can open - its own and every plugin's - is a row in
+`PanelRegistry`, addressed by id:
+
+```qml
+PanelRegistry.toggle("sidebarRight")
+PanelRegistry.open("desktopMenu", { x: mouseX, y: mouseY, screen: screen.name })
+PanelRegistry.close("launcher")
+PanelRegistry.closeAll()
+```
+
+```bash
+qs -c end4-pC ipc call panels list
+qs -c end4-pC ipc call panels toggle sidebarRight
+qs -c end4-pC ipc call panels state launcher
+```
+
+A plugin's `panels` entry is registered automatically, so `PanelRegistry.toggle("notes")`
+works from anywhere - another plugin, a keybind, the command line - without importing
+anything from the plugin that owns it.
+
+To *react* to a panel opening, bind to its state rather than polling:
+
+```qml
+PanelState {
+    panel: "launcher"
+    onOpenChanged: if (open) refresh()
+}
+```
+
+Or inside the panel itself:
+
+```qml
+PluginPopup {
+    // args are whatever the caller passed to open()
+    readonly property real spawnX: PanelRegistry.state("desktopMenu").args.x ?? 0
+}
+```
+
+This replaced a singleton of booleans (`GlobalStates.sidebarRightOpen`, and twenty more)
+that every panel, every bar button and every keybind referred to by name. A plugin
+could not add one, because adding one meant editing core. `GlobalStates` still exists,
+but only for things that are genuinely global session state - whether the screen is
+locked, whether Super is held.
+
+Panels in the same `group` close each other: opening the launcher closes the sidebar,
+because both are in the `overlay` group. Declare it in the manifest
+(`"group": "overlay"`) and exclusivity is handled.
+
+## State, storage and events
+
+### PluginStorage - remember things that are not settings
+
+A setting is something the user sets in the settings GUI. A note's text, a to-do list,
+the last window you had open, a cached exchange rate - none of those are settings, and
+none of them belong in the manifest's `settings` schema.
+
+```qml
+import qs.core
+
+Item {
+    // Infers the plugin id from the folder it is in.
+    PluginStore { id: store }
+
+    Component.onCompleted: {
+        store.set("lastOpened", Date.now())
+        store.append("history", { text: "hello", at: Date.now() })
+    }
+
+    // Reading is a plain property read, and it updates when the value changes.
+    StyledText { text: `${store.count("history")} entries` }
+}
+```
+
+Key-value: `get`, `set`, `has`, `remove`, `keys`, `clear`, `update`.
+Collections: `list`, `count`, `append`, `prepend`, `push` (append with a cap and
+de-duplication), `find`, `upsert`, `removeFrom`, `removeWhere`, `clearList`.
+
+It lives in the same `plugins.json` the settings live in, under a `storage` key, which
+means one file, one watcher and one coalesced writer for all plugin state. Writing in a
+loop is fine.
+
+### PluginBus - talk to a plugin you have never heard of
+
+```qml
+// The publisher
+PluginBus.publish("weather:current", { tempC: 21, icon: "sunny" })   // retained
+PluginBus.emit("weather:refreshed")                                   // fire and forget
+
+// The subscriber, anywhere else, with no import of the publisher
+PluginBusListener {
+    topic: "weather:*"                  // wildcards work
+    replayRetained: true                // get the current value immediately
+    onMessage: (topic, payload) => console.log(topic, payload.tempC)
+}
+```
+
+`publish` retains: a subscriber that appears later still sees the last value.
+`PluginBus.retained("weather:current")` hands back a live cell you can bind to, so a
+widget can render another plugin's data without either plugin knowing the other
+exists. This is how the desktop's file-drop reaches the dropover plugin - core emits
+`desktop:filesDropped` and does not know whether anything is listening.
+
+### PluginTimer - one place for everything time-shaped
+
+```qml
+PluginTimer.after(500, () => doIt())                    // once
+PluginTimer.every(60000, () => refresh())               // repeating, returns a handle
+PluginTimer.debounce("search", 250, () => run(query))   // last call wins
+PluginTimer.throttle("scroll", 100, () => update())     // first now, rest coalesced
+PluginTimer.cron("*/15 8-9 * * 1-5", () => standUp())   // real cron expressions
+PluginTimer.at(new Date(tomorrow), () => goodMorning()) // absolute time
+```
+
+Every form returns a handle with `stop()` and `isRunning`. `PluginTimer.stats` lists
+what is running, which is usually how you find the timer you forgot to stop.
+
+### PluginFs - files, asynchronously
+
+`read`, `readJson`, `readLines`, `write`, `writeJson`, `append`, `updateJson` all take
+a callback and hand back a uniform result object (`{ ok, path, text, data, error }`).
+`mkdir`, `remove`, `copy`, `move`, `exists`, `list` do the obvious thing. `readSync`
+exists for `/proc` and `/sys`, where an async read would be a poll behind.
+
+```qml
+PluginFsWatch {
+    path: "~/.config/thing/state.json"
+    json: true
+    onChanged: apply(data)          // fires on every write, parsed
+}
+```
+
+## UI building blocks
+
+`import qs.core` and none of this needs styling: every one of them reads `Theme`, so a
+plugin's UI changes with the wallpaper along with the rest of the shell.
+
+| Type | For |
+| --- | --- |
+| `PluginBarWidget` | a bar item. Handles pill styles, both bar orientations, tooltips, click and scroll |
+| `PluginBackgroundWidget` | a desktop widget. Handles dragging, snapping, persistence |
+| `PluginPopup` | a popup anchored to a bar widget |
+| `PluginDrawer` | a panel that slides in from an edge, optionally reserving space |
+| `PluginFloatingWindow` | a movable, resizable window whose geometry is remembered |
+| `PluginHud` | a transient overlay: `flash()` and it fades itself out |
+| `PluginCard`, `PluginDesktopCard` | the shell's surfaces, with its hover and press response |
+| `PluginRow`, `PluginSettingRow`, `PluginSeparator` | settings rows, the same ones the shell's own pages use |
+| `PluginForm` | a whole form from a field list, using the manifest's settings schema |
+| `PluginSections` | where a plugin's settings sections land on a page |
+| `PluginIconButton`, `PluginChip`, `PluginBadge` | the interactive small parts |
+| `PluginTabs`, `PluginListView` | a tab strip with a sliding indicator; a searchable list with an empty state |
+| `PluginSparkline`, `PluginGauge` | a chart and a radial meter, both Canvas-based and repainting only on change |
+| `PluginAppear`, `PluginTransition` | entrance animation, staggered, in one line |
+| `PluginSpectrum` | audio spectrum points, reference counted |
+| `PluginStore`, `PluginBusListener`, `PluginFsWatch`, `PanelState` | declarative wrappers for the singletons above |
+
+### Motion
+
+`Theme.motion` is the shell's animation vocabulary: four durations
+(`instant`, `quick`, `normal`, `slow`), seven curves (`standard`, `decel`, `accel`,
+`emphasized`, `spring`, `bounce`, `linear`), and `Theme.motion.delay(index)` for
+staggering a list without every widget inventing its own timing.
+
+```qml
+PluginAppear {
+    index: model.index          // staggered, capped so a long list does not crawl
+}
+```
+
+A plugin that uses `Theme.motion` moves like the shell. A plugin that hardcodes
+`duration: 200; easing.type: Easing.OutQuad` does not, and it shows.
 
 ## Base types
 

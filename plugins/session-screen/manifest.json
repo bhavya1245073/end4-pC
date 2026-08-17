@@ -11,7 +11,8 @@
         "panels": [
             {
                 "id": "sessionScreen",
-                "entry": "SessionScreen.qml"
+                "entry": "SessionScreen.qml",
+                "group": "overlay"
             }
         ]
     }

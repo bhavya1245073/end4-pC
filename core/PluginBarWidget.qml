@@ -49,6 +49,14 @@ Item {
     property bool vertical: false
     property bool mirrored: false
 
+    // How the bar knows `mirrored` is safe to write.
+    //
+    // `hasOwnProperty("mirrored")` is true for a read-only property too, and every Control - which
+    // is what RippleButton and therefore half the stock bar widgets are - has a read-only `mirrored`
+    // of its own. The bar was assigning to it and throwing a TypeError on every load, which aborted
+    // the rest of the handler.
+    readonly property bool acceptsMirroring: true
+
     // ------------------------------------------------------------------ content
 
     default property alias content: contentHolder.data

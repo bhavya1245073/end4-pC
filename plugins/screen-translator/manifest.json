@@ -11,7 +11,8 @@
         "panels": [
             {
                 "id": "screenTranslator",
-                "entry": "ScreenTranslator.qml"
+                "entry": "ScreenTranslator.qml",
+                "group": "overlay"
             }
         ]
     }

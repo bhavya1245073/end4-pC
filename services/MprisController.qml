@@ -41,6 +41,46 @@ Singleton {
             !(player.dbusName?.endsWith('.mpd') && !player.dbusName.endsWith('MediaPlayer2.mpd')));
     }
 
+	// Collapse players that are showing the same thing.
+	//
+	// Two buses can report one playback session - a browser and plasma-browser-integration, mpd and
+	// an mpd client - and a media widget that lists both looks broken. Grouped by track title, or by
+	// position and length landing within two seconds of each other, keeping whichever member of the
+	// group actually has cover art.
+	//
+	// This lived in the media-controls plugin, and the right sidebar called it without having it:
+	// `ReferenceError: filterDuplicatePlayers is not defined` on every sidebar open, which left the
+	// sidebar's player list undefined and empty. One implementation, in the service that owns the
+	// players, is why that cannot happen again.
+	function filterDuplicatePlayers(players) {
+	    let filtered = [];
+	    let used = new Set();
+
+	    for (let i = 0; i < players.length; ++i) {
+	        if (used.has(i))
+	            continue;
+	        let p1 = players[i];
+	        let group = [i];
+
+	        // Find duplicates by trackTitle prefix
+	        for (let j = i + 1; j < players.length; ++j) {
+	            let p2 = players[j];
+	            if (p1.trackTitle && p2.trackTitle && (p1.trackTitle.includes(p2.trackTitle) || p2.trackTitle.includes(p1.trackTitle)) || (p1.position - p2.position <= 2 && p1.length - p2.length <= 2)) {
+	                group.push(j);
+	            }
+	        }
+
+	        // Pick the one with non-empty trackArtUrl, or fallback to the first
+	        let chosenIdx = group.find(idx => players[idx].trackArtUrl && players[idx].trackArtUrl.length > 0);
+	        if (chosenIdx === undefined)
+	            chosenIdx = group[0];
+
+	        filtered.push(players[chosenIdx]);
+	        group.forEach(idx => used.add(idx));
+	    }
+	    return filtered;
+	}
+
 	// Original stuff from fox below
 	Instantiator {
 		model: Mpris.players;

@@ -31,7 +31,7 @@
       {
         "kind": "panels",
         "description": "",
-        "ref": "#/definitions/entryOnly"
+        "ref": "#/definitions/panel"
       },
       {
         "kind": "services",
@@ -753,6 +753,39 @@
             "enum": null
           }
         }
+      },
+      "panel": {
+        "description": "A window the shell can open, addressable through PanelRegistry.",
+        "required": [
+          "id",
+          "entry"
+        ],
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "entry": {
+            "type": "#/definitions/qmlFile",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "label": {
+            "type": "string",
+            "description": "Shown by `ipc call panels list` and in the settings GUI.",
+            "default": null,
+            "enum": null
+          },
+          "group": {
+            "type": "string",
+            "description": "Panels sharing a group close each other. \"overlay\" also means full-screen, which the bar and hot corners take into account.",
+            "default": null,
+            "enum": null
+          }
+        }
       }
     }
   },
@@ -1410,6 +1443,14 @@
             "name": "mirrored",
             "type": "bool",
             "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "acceptsMirroring",
+            "type": "bool",
+            "readonly": true,
+            "default": "true",
+            "doc": "`hasOwnProperty(\"mirrored\")` is true for a read-only property too, and every Control - which is what RippleButton and therefore half the stock bar widgets are - has a read-only `mi"
           },
           {
             "kind": "property",
@@ -7767,6 +7808,7 @@
         },
         "functions": [
           "isRealPlayer(player)",
+          "filterDuplicatePlayers(players)",
           "updateTrack()",
           "togglePlaying()",
           "previous()",
