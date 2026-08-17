@@ -27,6 +27,12 @@
 import QtQml
 
 // KEEP IN SYNC: every qs.* module imported anywhere under plugins/.
+//
+// Not `import qs`: the root module contains shell.qml, which imports PluginHost, which
+// instantiates this file - so anchoring it is a circular module import. It also is not needed,
+// because shell.qml is itself in `qs`, so the module is registered before anything runs. Adding
+// it produced two unrelated failures elsewhere (a binding loop in ToolbarTabBar and an undefined
+// assignment in GoogleCloud), which is what a partially initialised module looks like.
 import qs.core
 import qs.modules.common
 import qs.modules.common.functions

@@ -31,8 +31,19 @@ Toolbar {
         currentIndex: root.selectionMode === RegionSelection.SelectionMode.RectCorners ? 0 : 1
         onCurrentIndexChanged: {
             const newMode = currentIndex === 0 ? RegionSelection.SelectionMode.RectCorners : RegionSelection.SelectionMode.Circle;
-            if (root.selectionMode !== newMode)
-                root.selectionMode = newMode;
+            if (root.selectionMode === newMode)
+                return;
+            // Deferred, not written straight from the handler. `currentIndex` is bound to
+            // `selectionMode`, so assigning it here is a write during the evaluation of the
+            // binding that triggered it - which Qt correctly calls a binding loop, and resolves
+            // by dropping the binding. The tab strip then stops following the mode.
+            //
+            // The equality check above is not enough on its own: Qt reports the cycle, not the
+            // value, so writing the same value in the same pass is still a loop.
+            Qt.callLater(() => {
+                if (root.selectionMode !== newMode)
+                    root.selectionMode = newMode;
+            });
         }
     }
 }

@@ -1,77 +1,92 @@
 {
-    "id": "example-clock",
-    "name": "Example Clock",
-    "version": "1.0.0",
-    "apiVersion": 1,
-    "description": "Reference plugin. Adds a bar widget, a desktop widget and a launcher action, all configurable from Settings -> Plugins. Copy this folder to start your own.",
-    "author": "illogical-impulse",
-    "icon": "schedule",
-    "enabledByDefault": false,
-    "provides": {
-        "barWidgets": [
-            {
-                "id": "exampleClock",
-                "name": "Example Clock",
-                "icon": "schedule",
-                "entry": "BarClock.qml",
-                "pillColor": "secondaryContainer"
-            }
-        ],
-        "desktopWidgets": [
-            {
-                "id": "exampleDesktopClock",
-                "name": "Example Clock",
-                "icon": "schedule",
-                "entry": "DesktopClock.qml",
-                "enabledByDefault": true
-            }
-        ],
-        "launcherActions": [
-            {
-                "id": "exampletime",
-                "exec": ["notify-send", "Example Clock"]
-            }
+  "id": "example-clock",
+  "name": "Example Clock",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Reference plugin. Adds a bar widget, a desktop widget and a launcher action, all configurable from Settings -> Plugins. Copy this folder to start your own.",
+  "permissions": [
+    "notifications"
+  ],
+  "author": "illogical-impulse",
+  "icon": "schedule",
+  "enabledByDefault": false,
+  "provides": {
+    "barWidgets": [
+      {
+        "id": "exampleClock",
+        "name": "Example Clock",
+        "icon": "schedule",
+        "entry": "BarClock.qml",
+        "pillColor": "secondaryContainer"
+      }
+    ],
+    "desktopWidgets": [
+      {
+        "id": "exampleDesktopClock",
+        "name": "Example Clock",
+        "icon": "schedule",
+        "entry": "DesktopClock.qml",
+        "enabledByDefault": true
+      }
+    ],
+    "launcherActions": [
+      {
+        "id": "exampletime",
+        "exec": [
+          "notify-send",
+          "Example Clock"
         ]
-    },
-    "settings": [
-        {
-            "key": "format",
-            "type": "string",
-            "default": "hh:mm ap",
-            "label": "Time format",
-            "description": "Qt format string. Try HH:mm:ss, hh:mm ap, or ddd hh:mm.",
-            "icon": "schedule",
-            "placeholder": "hh:mm ap"
-        },
-        {
-            "key": "showDate",
-            "type": "bool",
-            "default": true,
-            "label": "Show the date",
-            "icon": "calendar_month"
-        },
-        {
-            "key": "desktopFontSize",
-            "type": "int",
-            "default": 48,
-            "min": 12,
-            "max": 160,
-            "step": 4,
-            "label": "Desktop clock size",
-            "description": "Font size of the desktop widget, in pixels.",
-            "icon": "format_size"
-        },
-        {
-            "key": "alignment",
-            "type": "enum",
-            "default": "center",
-            "label": "Desktop clock alignment",
-            "icon": "format_align_center",
-            "options": [
-                { "value": "left", "label": "Left" },
-                { "value": "center", "label": "Center" },
-                { "value": "right", "label": "Right" }
-            ]
-        }
+      }
     ]
+  },
+  "settings": [
+    {
+      "key": "format",
+      "type": "string",
+      "default": "hh:mm ap",
+      "label": "Time format",
+      "description": "Qt format string. Try HH:mm:ss, hh:mm ap, or ddd hh:mm.",
+      "icon": "schedule",
+      "placeholder": "hh:mm ap"
+    },
+    {
+      "key": "showDate",
+      "type": "bool",
+      "default": true,
+      "label": "Show the date",
+      "icon": "calendar_month"
+    },
+    {
+      "key": "desktopFontSize",
+      "type": "int",
+      "default": 48,
+      "min": 12,
+      "max": 160,
+      "step": 4,
+      "label": "Desktop clock size",
+      "description": "Font size of the desktop widget, in pixels.",
+      "icon": "format_size"
+    },
+    {
+      "key": "alignment",
+      "type": "enum",
+      "default": "center",
+      "label": "Desktop clock alignment",
+      "icon": "format_align_center",
+      "options": [
+        {
+          "value": "left",
+          "label": "Left"
+        },
+        {
+          "value": "center",
+          "label": "Center"
+        },
+        {
+          "value": "right",
+          "label": "Right"
+        }
+      ]
+    }
+  ]
 }

@@ -82,6 +82,11 @@
         "kind": "sidebarTabs",
         "description": "",
         "ref": "#/definitions/sidebarTab"
+      },
+      {
+        "kind": "actions",
+        "description": "",
+        "ref": "#/definitions/action"
       }
     ],
     "settingTypes": [
@@ -93,6 +98,50 @@
       "color"
     ],
     "definitions": {
+      "action": {
+        "description": "Something the plugin can be asked to do, reachable from the launcher, the command line (`qs ipc call intent call \"plugin:action\"`), a keybind, a context menu and other plugins (PluginIntent.call). Implement it with a PluginIntentHandler in a file the plugin already loads - its service is the usual place. Arguments are validated against `schema` before the handler runs.",
+        "required": [
+          "id"
+        ],
+        "fields": {
+          "id": {
+            "type": "string",
+            "description": "Referred to as pluginId:actionId everywhere.",
+            "default": null,
+            "enum": null
+          },
+          "label": {
+            "type": "string",
+            "description": "What the launcher shows. Defaults to the id.",
+            "default": null,
+            "enum": null
+          },
+          "description": {
+            "type": "string",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "icon": {
+            "type": "#/definitions/materialSymbol",
+            "description": "",
+            "default": null,
+            "enum": null
+          },
+          "keywords": {
+            "type": "array",
+            "description": "Extra words the launcher matches, for an action whose name is not what a user would type.",
+            "default": null,
+            "enum": null
+          },
+          "schema": {
+            "type": "object",
+            "description": "Named arguments. The first required one - or the first declared one - receives whatever the user typed after the action name in the launcher, and a bare value on the command line.",
+            "default": null,
+            "enum": null
+          }
+        }
+      },
       "materialSymbol": {
         "description": "A Material Symbols Rounded ligature name, e.g. battery_full. Not a file path.",
         "required": [],
@@ -1285,6 +1334,64 @@
         ]
       },
       {
+        "name": "PluginBackdropBlur",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "Blur of what is behind a surface, as far as a Wayland client can honestly manage.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "radius",
+            "type": "real",
+            "default": "0",
+            "doc": "Corner radius of the blurred region."
+          },
+          {
+            "kind": "property",
+            "name": "strength",
+            "type": "real",
+            "default": "0.62",
+            "doc": "0..1. Above ~0.75 the wallpaper stops being recognisable and the effect reads as noise."
+          },
+          {
+            "kind": "property",
+            "name": "tint",
+            "type": "color",
+            "default": "Theme.solid",
+            "doc": "Tint over the blur. The surface colour at low alpha is what makes text on top readable, and without it a light wallpaper makes any label unreadable."
+          },
+          {
+            "kind": "property",
+            "name": "tintAlpha",
+            "type": "real",
+            "default": "0.55"
+          },
+          {
+            "kind": "property",
+            "name": "saturation",
+            "type": "real",
+            "default": "0.35",
+            "doc": "Desaturating the blur keeps a colourful wallpaper from fighting the accent colour."
+          },
+          {
+            "kind": "property",
+            "name": "sampling",
+            "type": "bool",
+            "readonly": true,
+            "default": "wallpaperSource.sourceItem !== null",
+            "doc": "Whether the wallpaper source could be found. False on a screen with no wallpaper surface, where the tint alone is used."
+          },
+          {
+            "kind": "property",
+            "name": "compositorHint",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "The layer rule a user adds to blur *everything* behind this surface, including other windows. Printed by PluginFX.blurRule() too."
+          }
+        ]
+      },
+      {
         "name": "PluginBackgroundWidget",
         "kind": "type",
         "extends": "AbstractWidget",
@@ -1726,6 +1833,266 @@
         ]
       },
       {
+        "name": "PluginContentView",
+        "kind": "type",
+        "extends": "FocusScope",
+        "summary": "A searchable, keyboard-navigable, image-aware view of a list of things.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "-------------------------------------------------------------- data in"
+          },
+          {
+            "kind": "property",
+            "name": "items",
+            "type": "var",
+            "default": "[]"
+          },
+          {
+            "kind": "property",
+            "name": "loading",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "mode",
+            "type": "string",
+            "default": "\"grid\"",
+            "doc": "\"grid\" | \"list\" | \"detail\" | \"carousel\""
+          },
+          {
+            "kind": "property",
+            "name": "cellWidth",
+            "type": "real",
+            "default": "132",
+            "doc": "Grid geometry. The view fits as many columns as it can and shares the remainder, so a resize never leaves a ragged right edge."
+          },
+          {
+            "kind": "property",
+            "name": "cellHeight",
+            "type": "real",
+            "default": "108"
+          },
+          {
+            "kind": "property",
+            "name": "rowHeight",
+            "type": "real",
+            "default": "52"
+          },
+          {
+            "kind": "property",
+            "name": "spacing",
+            "type": "real",
+            "default": "Theme.pad.s"
+          },
+          {
+            "kind": "property",
+            "name": "searchable",
+            "type": "bool",
+            "default": "true",
+            "doc": "------------------------------------------------------------- searching"
+          },
+          {
+            "kind": "property",
+            "name": "searchPlaceholder",
+            "type": "string",
+            "default": "qsTr(\"Search\")"
+          },
+          {
+            "kind": "property",
+            "name": "debounceMs",
+            "type": "int",
+            "default": "180"
+          },
+          {
+            "kind": "property",
+            "name": "searchFields",
+            "type": "var",
+            "default": "[]",
+            "doc": "Which fields local filtering looks at. Empty means every string field."
+          },
+          {
+            "kind": "property",
+            "name": "query",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "Live text, as typed."
+          },
+          {
+            "kind": "property",
+            "name": "activeQuery",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "Debounced text. What a provider is asked for, and what local filtering uses."
+          },
+          {
+            "kind": "property",
+            "name": "onSearch",
+            "type": "var",
+            "default": "null",
+            "doc": "Bind this for provider-side search. Its presence switches local filtering off."
+          },
+          {
+            "kind": "property",
+            "name": "categories",
+            "type": "var",
+            "default": "[]",
+            "doc": "Category chips above the list. [{ id, label, icon }]"
+          },
+          {
+            "kind": "property",
+            "name": "category",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "actions",
+            "type": "var",
+            "default": "[]",
+            "doc": "------------------------------------------------------------- behaviour [{ id, icon, label, tone, onTriggered(item), shown(item) }]"
+          },
+          {
+            "kind": "property",
+            "name": "emptyIcon",
+            "type": "string",
+            "default": "\"inbox\""
+          },
+          {
+            "kind": "property",
+            "name": "emptyText",
+            "type": "string",
+            "default": "qsTr(\"Nothing here yet\")"
+          },
+          {
+            "kind": "property",
+            "name": "emptySubtitle",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "noMatchText",
+            "type": "string",
+            "default": "qsTr(\"No matches\")"
+          },
+          {
+            "kind": "property",
+            "name": "delegate",
+            "type": "Component",
+            "default": "null",
+            "doc": "Replace the built-in delegate. Receives `modelData`, `index`, `selected`, `hovered`."
+          },
+          {
+            "kind": "property",
+            "name": "showHeader",
+            "type": "bool",
+            "default": "true",
+            "doc": "Show the count and the mode switch above the content."
+          },
+          {
+            "kind": "property",
+            "name": "allowModeSwitch",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "signal",
+            "name": "activated",
+            "args": "var item, int index"
+          },
+          {
+            "kind": "signal",
+            "name": "previewed",
+            "args": "var item, int index"
+          },
+          {
+            "kind": "signal",
+            "name": "dismissed"
+          },
+          {
+            "kind": "property",
+            "name": "visibleItems",
+            "type": "var",
+            "readonly": true,
+            "doc": "------------------------------------------------------------- data out"
+          },
+          {
+            "kind": "property",
+            "name": "count",
+            "type": "int",
+            "readonly": true,
+            "default": "root.visibleItems.length"
+          },
+          {
+            "kind": "property",
+            "name": "empty",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.count === 0 && !root.loading"
+          },
+          {
+            "kind": "property",
+            "name": "currentIndex",
+            "type": "int",
+            "default": "-1"
+          },
+          {
+            "kind": "property",
+            "name": "currentItem",
+            "type": "var",
+            "readonly": true,
+            "default": "(root.currentIndex >= 0 && root.currentIndex < root.count)"
+          },
+          {
+            "kind": "function",
+            "name": "focusSearch",
+            "returns": "void",
+            "doc": "------------------------------------------------------------- functions"
+          },
+          {
+            "kind": "function",
+            "name": "clearSearch",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "activateCurrent",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "select",
+            "args": "index: int",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "moveBy",
+            "args": "delta: int",
+            "returns": "void",
+            "doc": "Arrow keys. `columns` is 1 in list mode, so the same two calls serve both."
+          },
+          {
+            "kind": "function",
+            "name": "moveRow",
+            "args": "delta: int",
+            "returns": "void"
+          },
+          {
+            "kind": "property",
+            "name": "columns",
+            "type": "int",
+            "readonly": true
+          }
+        ]
+      },
+      {
         "name": "PluginDesktopCard",
         "kind": "type",
         "extends": "PluginBackgroundWidget",
@@ -1907,6 +2274,59 @@
         ]
       },
       {
+        "name": "PluginDraggable",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "Makes its content draggable into other applications.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "path",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "What to drag. A path is offered as a file URI (what file managers and chat apps want); text is offered as text/plain. Both may be set - the receiver picks."
+          },
+          {
+            "kind": "property",
+            "name": "text",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "mimeData",
+            "type": "var",
+            "default": "({})",
+            "doc": "Extra MIME data for plugin-to-plugin drags: { \"application/x-my-thing\": \"payload\" }"
+          },
+          {
+            "kind": "property",
+            "name": "enabled",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "dragging",
+            "type": "bool",
+            "readonly": true,
+            "default": "dragArea.drag.active"
+          },
+          {
+            "kind": "signal",
+            "name": "clicked"
+          },
+          {
+            "kind": "signal",
+            "name": "dragStarted"
+          },
+          {
+            "kind": "signal",
+            "name": "dragFinished"
+          }
+        ]
+      },
+      {
         "name": "PluginDrawer",
         "kind": "type",
         "extends": "Item",
@@ -2014,6 +2434,195 @@
         ]
       },
       {
+        "name": "PluginDropTarget",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "Accepts things dragged onto it, with the URI decoding and the hover feedback already done.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "acceptFiles",
+            "type": "bool",
+            "default": "true",
+            "doc": "What to accept. Anything not listed is refused, so a widget that wants files does not light up for dragged text."
+          },
+          {
+            "kind": "property",
+            "name": "acceptText",
+            "type": "bool",
+            "default": "true"
+          },
+          {
+            "kind": "property",
+            "name": "mimeTypes",
+            "type": "var",
+            "default": "[]",
+            "doc": "Extra MIME types, for a plugin with its own drag payloads."
+          },
+          {
+            "kind": "property",
+            "name": "showHighlight",
+            "type": "bool",
+            "default": "true",
+            "doc": "Visual feedback. `false` if the surrounding widget draws its own."
+          },
+          {
+            "kind": "property",
+            "name": "highlightRadius",
+            "type": "real",
+            "default": "Theme.radius.m"
+          },
+          {
+            "kind": "property",
+            "name": "highlightIcon",
+            "type": "string",
+            "default": "\"download\""
+          },
+          {
+            "kind": "property",
+            "name": "highlightText",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "dragging",
+            "type": "bool",
+            "readonly": true,
+            "default": "dropArea.containsDrag"
+          },
+          {
+            "kind": "property",
+            "name": "acceptable",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "signal",
+            "name": "filesDropped",
+            "args": "var paths",
+            "doc": "Real filesystem paths, decoded."
+          },
+          {
+            "kind": "signal",
+            "name": "textDropped",
+            "args": "string text",
+            "doc": "Plain text."
+          },
+          {
+            "kind": "signal",
+            "name": "urlsDropped",
+            "args": "var urls",
+            "doc": "URLs that are not files - a link from a browser, a magnet URI."
+          },
+          {
+            "kind": "signal",
+            "name": "dropped",
+            "args": "var payload",
+            "doc": "Everything, for a target that wants to decide for itself."
+          }
+        ]
+      },
+      {
+        "name": "PluginErrorBoundary",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "Loads a plugin's QML and shows the error where the plugin should have been.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "What to load, and who to blame."
+          },
+          {
+            "kind": "property",
+            "name": "entry",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "inject",
+            "type": "var",
+            "default": "({})"
+          },
+          {
+            "kind": "property",
+            "name": "surface",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "A label for the surface this boundary is standing in for, used in the error text: \"bar widget\", \"desktop widget\", \"panel\"."
+          },
+          {
+            "kind": "property",
+            "name": "compact",
+            "type": "bool",
+            "default": "false",
+            "doc": "How much room the error is allowed. `compact` is for a bar: one line, no buttons until hovered. Anything else gets the card."
+          },
+          {
+            "kind": "property",
+            "name": "showErrors",
+            "type": "bool",
+            "default": "Config.options?.plugins?.showErrors ?? true",
+            "doc": "Set false to keep failures invisible - for a probe or a test harness that expects them. Defaults to the shell-wide setting, so a screenshot can hide every error card at once."
+          },
+          {
+            "kind": "property",
+            "name": "failed",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.errorText.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "loading",
+            "type": "bool",
+            "readonly": true,
+            "default": "loader.status === Loader.Loading"
+          },
+          {
+            "kind": "property",
+            "name": "loadedItem",
+            "type": "Item",
+            "readonly": true,
+            "default": "loader.item"
+          },
+          {
+            "kind": "property",
+            "name": "errorText",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "errorDetail",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "signal",
+            "name": "failedToLoad",
+            "args": "string message"
+          },
+          {
+            "kind": "function",
+            "name": "retry",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "report",
+            "args": "error: var",
+            "returns": "void",
+            "doc": "For a plugin reporting its own runtime failure into the same UI."
+          }
+        ]
+      },
+      {
         "name": "PluginFloatingWindow",
         "kind": "type",
         "extends": "Item",
@@ -2024,13 +2633,19 @@
             "name": "pluginId",
             "type": "string",
             "default": "\"\"",
-            "doc": "Identity. `pluginId` is what plugins.json is keyed on, `windowId` distinguishes several windows belonging to one plugin."
+            "doc": "Identity. `pluginId` is what plugins.json is keyed on, `windowId` distinguishes several windows belonging to one plugin, `panelId` is the PanelRegistry id it answers to (defaults t"
           },
           {
             "kind": "property",
             "name": "windowId",
             "type": "string",
             "default": "\"window\""
+          },
+          {
+            "kind": "property",
+            "name": "panelId",
+            "type": "string",
+            "default": "root.pluginId"
           },
           {
             "kind": "property",
@@ -2068,7 +2683,31 @@
             "kind": "property",
             "name": "open",
             "type": "bool",
-            "default": "false"
+            "readonly": true,
+            "default": "root.addressable ? panelBinding.open : root.localOpen",
+            "doc": "Route writes through show()/hide()/toggle(). Assigning `open` cannot desync it, because there is nothing to assign."
+          },
+          {
+            "kind": "property",
+            "name": "openArgs",
+            "type": "var",
+            "readonly": true,
+            "default": "panelBinding.args",
+            "doc": "Why the panel was opened, when it was opened through the registry: PanelRegistry.open(id, args) args, `{}` otherwise. Lets one window serve several entry points."
+          },
+          {
+            "kind": "property",
+            "name": "addressable",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.panelId.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "localOpen",
+            "type": "bool",
+            "default": "false",
+            "doc": "Fallback for a window with no pluginId and no panelId. It works, but nothing outside the plugin can reach it - see the warning in Component.onCompleted below."
           },
           {
             "kind": "property",
@@ -2415,6 +3054,53 @@
         ]
       },
       {
+        "name": "PluginGlowBorder",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A glow around something, for focus and drag-over states.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "target",
+            "type": "Item",
+            "default": "root.parent",
+            "doc": "What to glow around. Defaults to the parent, which is the common case."
+          },
+          {
+            "kind": "property",
+            "name": "active",
+            "type": "bool",
+            "default": "false"
+          },
+          {
+            "kind": "property",
+            "name": "colour",
+            "type": "color",
+            "default": "Theme.accent"
+          },
+          {
+            "kind": "property",
+            "name": "size",
+            "type": "real",
+            "default": "8",
+            "doc": "How far out the glow reaches."
+          },
+          {
+            "kind": "property",
+            "name": "radius",
+            "type": "real",
+            "default": "root.target?.radius ?? Theme.radius.m",
+            "doc": "Corner radius of the target. Read from it when it has one."
+          },
+          {
+            "kind": "property",
+            "name": "intensity",
+            "type": "real",
+            "default": "0.55"
+          }
+        ]
+      },
+      {
         "name": "PluginHost",
         "kind": "type",
         "extends": "Scope",
@@ -2603,6 +3289,52 @@
         ]
       },
       {
+        "name": "PluginIntentHandler",
+        "kind": "type",
+        "extends": "QtObject",
+        "summary": "One action a plugin implements, reachable from everywhere.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "action",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "ref",
+            "type": "string",
+            "readonly": true,
+            "default": "`${root.pluginId}:${root.action}`"
+          },
+          {
+            "kind": "signal",
+            "name": "invoked",
+            "args": "var args",
+            "doc": "Called with the validated argument object. Assign a function, or use `onInvoked`."
+          },
+          {
+            "kind": "property",
+            "name": "handle",
+            "type": "var",
+            "default": "null",
+            "doc": "PluginIntent calls this. Split from the signal so a handler can return a value: a signal emission cannot."
+          },
+          {
+            "kind": "function",
+            "name": "invoke",
+            "args": "args: var",
+            "returns": "var"
+          }
+        ]
+      },
+      {
         "name": "PluginIpc",
         "kind": "type",
         "extends": "IpcHandler",
@@ -2778,6 +3510,55 @@
         ]
       },
       {
+        "name": "PluginMeshGradient",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A slow animated gradient in the current Material You palette, for the background of a card, a header or an empty state.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "radius",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "motion",
+            "type": "real",
+            "default": "0.5",
+            "doc": "0..1. How far the blobs drift from their resting positions."
+          },
+          {
+            "kind": "property",
+            "name": "intensity",
+            "type": "real",
+            "default": "0.5",
+            "doc": "How strong the colour is over the base. Low by default: this is a background, and text goes on top of it."
+          },
+          {
+            "kind": "property",
+            "name": "periodSeconds",
+            "type": "real",
+            "default": "34",
+            "doc": "Seconds for one full cycle. Deliberately long - anything under ~20 s reads as movement rather than as a living surface."
+          },
+          {
+            "kind": "property",
+            "name": "base",
+            "type": "color",
+            "default": "Theme.solid"
+          },
+          {
+            "kind": "property",
+            "name": "palette",
+            "type": "var",
+            "readonly": true,
+            "default": "[Theme.accent, Theme.notice, Theme.accentMuted, Theme.high]",
+            "doc": "Drawn from the palette rather than hard-coded, so this follows the wallpaper."
+          }
+        ]
+      },
+      {
         "name": "PluginModuleAnchors",
         "kind": "type",
         "extends": "QtObject",
@@ -2828,6 +3609,87 @@
             "type": "real",
             "default": "320",
             "doc": "How wide the panel is allowed to get before text wraps."
+          }
+        ]
+      },
+      {
+        "name": "PluginProgressiveImage",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "A still image now, an animated one when it matters.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "thumbnail",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "A still image URL. Loaded as soon as the item is on screen."
+          },
+          {
+            "kind": "property",
+            "name": "preview",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "An animated image URL. Loaded only while `playing`."
+          },
+          {
+            "kind": "property",
+            "name": "playing",
+            "type": "bool",
+            "default": "false",
+            "doc": "Whether the animation should run. Usually bound to hover."
+          },
+          {
+            "kind": "property",
+            "name": "radius",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "fallbackIcon",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "Shown when there is no image at all: a Material Symbol, a flat colour, or a label."
+          },
+          {
+            "kind": "property",
+            "name": "fallbackColour",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "label",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "fillMode",
+            "type": "int",
+            "default": "Image.PreserveAspectCrop"
+          },
+          {
+            "kind": "property",
+            "name": "hasMedia",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.thumbnail.length > 0 || root.preview.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "ready",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "failed",
+            "type": "bool",
+            "readonly": true,
+            "default": "stillImage.status === Image.Error"
           }
         ]
       },
@@ -3375,6 +4237,59 @@
         ]
       },
       {
+        "name": "PluginSurface",
+        "kind": "type",
+        "extends": "Item",
+        "summary": "One plugin file that renders correctly wherever it is mounted.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "pluginId",
+            "type": "string",
+            "default": "\"\""
+          },
+          {
+            "kind": "property",
+            "name": "barContent",
+            "type": "Component",
+            "default": "null",
+            "doc": "The slots, in increasing order of room."
+          },
+          {
+            "kind": "property",
+            "name": "flyoutContent",
+            "type": "Component",
+            "default": "null"
+          },
+          {
+            "kind": "property",
+            "name": "fullContent",
+            "type": "Component",
+            "default": "null"
+          },
+          {
+            "kind": "property",
+            "name": "slot",
+            "type": "int",
+            "default": "PluginResponsive.slot",
+            "doc": "Where this instance thinks it is. Defaults to whatever the host declared through PluginResponsive, and can be overridden for a host that mounts content itself."
+          },
+          {
+            "kind": "property",
+            "name": "content",
+            "type": "Item",
+            "readonly": true,
+            "default": "slotLoader.item"
+          },
+          {
+            "kind": "property",
+            "name": "chosen",
+            "type": "Component",
+            "readonly": true
+          }
+        ]
+      },
+      {
         "name": "PluginTabs",
         "kind": "type",
         "extends": "Item",
@@ -3432,6 +4347,56 @@
             "kind": "function",
             "name": "previous",
             "returns": "void"
+          }
+        ]
+      },
+      {
+        "name": "PluginToastHost",
+        "kind": "type",
+        "extends": "Scope",
+        "summary": "The window PluginToast draws into.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "toast",
+            "type": "var",
+            "readonly": true,
+            "default": "PluginToast.current"
+          },
+          {
+            "kind": "property",
+            "name": "toastId",
+            "type": "int",
+            "readonly": true,
+            "default": "root.toast?.id ?? 0"
+          },
+          {
+            "kind": "property",
+            "name": "tone",
+            "type": "string",
+            "readonly": true,
+            "default": "root.toast?.tone ?? \"accent\""
+          },
+          {
+            "kind": "property",
+            "name": "fillColour",
+            "type": "color",
+            "readonly": true,
+            "default": "Theme.solid",
+            "doc": "Tinting the whole pill per tone is the obvious version and it is wrong twice: the four tone containers do not have a guaranteed contrast pairing with each other, so \"success\" and \""
+          },
+          {
+            "kind": "property",
+            "name": "inkColour",
+            "type": "color",
+            "readonly": true,
+            "default": "Theme.text"
+          },
+          {
+            "kind": "property",
+            "name": "markColour",
+            "type": "color",
+            "readonly": true
           }
         ]
       },
@@ -3547,6 +4512,13 @@
             "name": "name",
             "args": "id: string",
             "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "pluginIdOf",
+            "args": "id: string",
+            "returns": "string",
+            "doc": "Which plugin owns a widget, or \"\" for a built-in. Used to attribute a load failure to the plugin rather than to the bar, and to offer \"turn it off\" in the error card."
           },
           {
             "kind": "function",
@@ -4774,6 +5746,122 @@
         ]
       },
       {
+        "name": "PluginContext",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "What the user is doing right now, so a plugin can act on it instead of asking.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "liveToplevel",
+            "type": "Toplevel",
+            "readonly": true,
+            "default": "ToplevelManager.activeToplevel",
+            "doc": "------------------------------------------------------------ focused app The live focused toplevel, which is the shell itself whenever a plugin surface has focus. Plugins want `foc"
+          },
+          {
+            "kind": "property",
+            "name": "ownAppIds",
+            "type": "var",
+            "readonly": true,
+            "default": "[\"quickshell\", \"org.quickshell\", \"\"]",
+            "doc": "Set of app ids belonging to this shell, so they are never latched as \"the app the user was in\". Quickshell reports its own surfaces under its own app id."
+          },
+          {
+            "kind": "property",
+            "name": "focusedApp",
+            "type": "var",
+            "default": "({ title: \"\", windowClass: \"\", address: \"\", pid: 0, at: 0 })",
+            "doc": "The last real application to hold focus: { title, windowClass, address, pid, at }."
+          },
+          {
+            "kind": "function",
+            "name": "focusedIs",
+            "args": "appIdFragment: string",
+            "returns": "bool",
+            "doc": "\"Is the user in a terminal / in Discord / in a browser\", asked without every plugin hard-coding app id lists."
+          },
+          {
+            "kind": "property",
+            "name": "selectedText",
+            "type": "string",
+            "default": "\"\"",
+            "doc": "---------------------------------------------------------- selected text The primary selection as of the last refresh, and how old that is."
+          },
+          {
+            "kind": "property",
+            "name": "selectionAt",
+            "type": "real",
+            "default": "0"
+          },
+          {
+            "kind": "property",
+            "name": "selectionAgeMs",
+            "type": "real",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "hasSelection",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.selectedText.length > 0"
+          },
+          {
+            "kind": "property",
+            "name": "selectionMaxAgeMs",
+            "type": "int",
+            "readonly": true,
+            "default": "4000",
+            "doc": "How long a captured selection is treated as current."
+          },
+          {
+            "kind": "function",
+            "name": "refreshSelection",
+            "args": "callback: var",
+            "returns": "void",
+            "doc": "Refreshes the primary selection and calls back with it. Safe to call often - a refresh already in flight is joined rather than duplicated."
+          },
+          {
+            "kind": "property",
+            "name": "clipboard",
+            "type": "QtObject",
+            "readonly": true,
+            "default": "QtObject",
+            "doc": "------------------------------------------------------------- clipboard"
+          },
+          {
+            "kind": "property",
+            "name": "activeMonitor",
+            "type": "var",
+            "readonly": true,
+            "default": "PluginWM.focusedMonitor",
+            "doc": "--------------------------------------------------------------- displays The monitor the user is on: whichever holds the focused window, falling back to the compositor's focused mo"
+          },
+          {
+            "kind": "property",
+            "name": "activeWorkspace",
+            "type": "int",
+            "readonly": true,
+            "default": "PluginWM.activeWorkspaceId"
+          },
+          {
+            "kind": "property",
+            "name": "activeWorkspaceName",
+            "type": "string",
+            "readonly": true,
+            "default": "PluginWM.activeWorkspaceName"
+          },
+          {
+            "kind": "function",
+            "name": "snapshot",
+            "returns": "var",
+            "doc": "------------------------------------------------------------------ shape Everything at once, for a plugin that wants to snapshot the context at the moment it was invoked rather tha"
+          }
+        ]
+      },
+      {
         "name": "PluginDialogs",
         "kind": "singleton",
         "extends": "Singleton",
@@ -5180,6 +6268,514 @@
             "type": "Component",
             "readonly": true,
             "default": "Component"
+          }
+        ]
+      },
+      {
+        "name": "PluginFX",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Effects support: what can be done on this machine, and the bits an effect needs to find.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "effectsAllowed",
+            "type": "bool",
+            "readonly": true,
+            "default": "PluginLifecycle.animate",
+            "doc": "Blur, mesh gradients and glow all cost GPU time every frame they change. In power-saver mode they are the first thing to go, and effects bind to this rather than each deciding for "
+          },
+          {
+            "kind": "property",
+            "name": "wallpaperItem",
+            "type": "Item",
+            "default": "null",
+            "doc": "Registered by the background module rather than looked up, because there is no path from here to it - the background is created per screen inside a Variants, and reaching into that"
+          },
+          {
+            "kind": "function",
+            "name": "registerWallpaper",
+            "args": "item: Item",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "unregisterWallpaper",
+            "args": "item: Item",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "blurRule",
+            "args": "namespace: string",
+            "returns": "string",
+            "doc": "The compositor rule for a genuine backdrop blur of everything behind a surface, including other applications - which no client-side effect can do. Printed by `qs ipc call plugins f"
+          },
+          {
+            "kind": "property",
+            "name": "compositorBlurAvailable",
+            "type": "bool",
+            "readonly": true,
+            "default": "PluginWM.compositor === \"hyprland\"",
+            "doc": "Whether the compositor is one whose blur rules mean anything, so a plugin can offer the hint only where it applies."
+          },
+          {
+            "kind": "function",
+            "name": "describe",
+            "returns": "var"
+          }
+        ]
+      },
+      {
+        "name": "PluginHistory",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Undo for the desktop.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "limit",
+            "type": "int",
+            "readonly": true,
+            "default": "40"
+          },
+          {
+            "kind": "property",
+            "name": "maxAgeMs",
+            "type": "real",
+            "readonly": true,
+            "default": "15 * 60 * 1000"
+          },
+          {
+            "kind": "property",
+            "name": "undoStack",
+            "type": "var",
+            "default": "[]",
+            "doc": "Newest first. Entries: { id, label, pluginId, icon, undo, redo, at }"
+          },
+          {
+            "kind": "property",
+            "name": "redoStack",
+            "type": "var",
+            "default": "[]"
+          },
+          {
+            "kind": "property",
+            "name": "canUndo",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "canRedo",
+            "type": "bool",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "nextUndoLabel",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "nextRedoLabel",
+            "type": "string",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "function",
+            "name": "record",
+            "args": "labelOrEntry: var, maybeEntry: var",
+            "returns": "int",
+            "doc": "----------------------------------------------------------------- record Accepts a descriptor, or `record(label, { undo, redo })` for the shorter form."
+          },
+          {
+            "kind": "function",
+            "name": "recordWithToast",
+            "args": "labelOrEntry: var, maybeEntry: var",
+            "returns": "int",
+            "doc": "Records *and* offers an immediate undo in the toast, which is where most of these belong: the moment after the click is when the user notices the mistake."
+          },
+          {
+            "kind": "function",
+            "name": "undo",
+            "returns": "bool",
+            "doc": "------------------------------------------------------------------- act"
+          },
+          {
+            "kind": "function",
+            "name": "redo",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "undoEntry",
+            "args": "id: int",
+            "returns": "bool",
+            "doc": "Undo one specific entry, not necessarily the newest - what the toast's own Undo button uses, so clicking it after doing something else still reverses the thing it was offered for r"
+          },
+          {
+            "kind": "function",
+            "name": "redoEntry",
+            "args": "id: int",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "clear",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "forget",
+            "args": "pluginId: string",
+            "returns": "int",
+            "doc": "Drops everything a plugin recorded. Called when a plugin is switched off: its closures reference objects that are being torn down."
+          },
+          {
+            "kind": "function",
+            "name": "list",
+            "returns": "var",
+            "doc": "------------------------------------------------------------- diagnostics"
+          }
+        ]
+      },
+      {
+        "name": "PluginHttp",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "HTTP for plugins, with the four things hand-rolled `curl` calls never have: a cache, a timeout, cancellation when the caller goes away, and one place to look when a request misbehaves.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "defaultTimeoutMs",
+            "type": "int",
+            "readonly": true,
+            "default": "5000",
+            "doc": "Default ceiling on a request. Long enough for a slow API, short enough that a plugin waiting on it does not look broken."
+          },
+          {
+            "kind": "property",
+            "name": "maxCacheEntries",
+            "type": "int",
+            "readonly": true,
+            "default": "120",
+            "doc": "How many bodies to keep. Entries are evicted oldest-first; a cache that grows without limit in a process that runs for weeks is a leak with a nice name."
+          },
+          {
+            "kind": "property",
+            "name": "inFlight",
+            "type": "int",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "property",
+            "name": "enabled",
+            "type": "bool",
+            "default": "true",
+            "doc": "Set by the settings GUI or a plugin under test. When off, every request fails immediately with a cache fallback if there is one - which is also how offline mode is tested without u"
+          },
+          {
+            "kind": "function",
+            "name": "get",
+            "args": "url: string, options: var, callback: var",
+            "returns": "int",
+            "doc": "------------------------------------------------------------------- verbs options:   pluginId    attribution and the permission check   owner       QtObject whose destruction cance"
+          },
+          {
+            "kind": "function",
+            "name": "post",
+            "args": "url: string, body: var, options: var, callback: var",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "put",
+            "args": "url: string, body: var, options: var, callback: var",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "del",
+            "args": "url: string, options: var, callback: var",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "head",
+            "args": "url: string, options: var, callback: var",
+            "returns": "int",
+            "doc": "Fire and forget, for a ping that nobody reads."
+          },
+          {
+            "kind": "function",
+            "name": "request",
+            "args": "method: string, url: string, body: var, options: var, callback: var",
+            "returns": "int",
+            "doc": "----------------------------------------------------------------- request"
+          },
+          {
+            "kind": "function",
+            "name": "cancel",
+            "args": "id: int",
+            "returns": "bool",
+            "doc": "------------------------------------------------------------ cancellation"
+          },
+          {
+            "kind": "function",
+            "name": "cancelFor",
+            "args": "pluginId: string",
+            "returns": "int",
+            "doc": "Everything a plugin has in flight. Called when a plugin is switched off, so its requests do not land in a shell that no longer has it."
+          },
+          {
+            "kind": "function",
+            "name": "cancelAll",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "clearCache",
+            "returns": "int",
+            "doc": "------------------------------------------------------------------- cache"
+          },
+          {
+            "kind": "property",
+            "name": "cacheEntries",
+            "type": "int",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "function",
+            "name": "cacheStats",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "hostOf",
+            "args": "url: string",
+            "returns": "string",
+            "doc": "--------------------------------------------------------------- internals"
+          }
+        ]
+      },
+      {
+        "name": "PluginIntent",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "One way to invoke anything a plugin can do.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "actions",
+            "type": "var",
+            "readonly": true,
+            "default": "PluginRegistry.collect(\"actions\")",
+            "doc": "---------------------------------------------------------------- registry Every declared action, tagged with its plugin. Comes from the manifests, so an action is listed - and show"
+          },
+          {
+            "kind": "property",
+            "name": "handlers",
+            "type": "var",
+            "default": "({})",
+            "doc": "ref -> handler object. Handlers register themselves; PluginIntentHandler does it."
+          },
+          {
+            "kind": "function",
+            "name": "register",
+            "args": "ref: string, handler: var",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "unregister",
+            "args": "ref: string",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "describe",
+            "args": "ref: string",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "has",
+            "args": "ref: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "property",
+            "name": "unimplemented",
+            "type": "var",
+            "readonly": true,
+            "default": "root.actions",
+            "doc": "Declared in a manifest but with nothing implementing it. The usual cause is a plugin that is switched off, which is not an error - but a handler missing while the plugin is on is a"
+          },
+          {
+            "kind": "function",
+            "name": "call",
+            "args": "ref: string, args: var",
+            "returns": "var",
+            "doc": "------------------------------------------------------------------- calling Returns { ok, ref, error, result }. Never throws: a caller may be an IPC handler, a launcher row or anot"
+          },
+          {
+            "kind": "function",
+            "name": "invoke",
+            "args": "ref: string, args: var",
+            "returns": "bool",
+            "doc": "Same, but reports failures to the user rather than only to the caller. What a launcher row or a keybind wants: the user pressed something and deserves to know it did nothing."
+          },
+          {
+            "kind": "function",
+            "name": "refs",
+            "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "validate",
+            "args": "ref: string, args: var",
+            "returns": "var",
+            "doc": "--------------------------------------------------------------- validation Checks `args` against the action's declared schema and returns { ok, args, error } with defaults filled i"
+          },
+          {
+            "kind": "function",
+            "name": "match",
+            "args": "query: string",
+            "returns": "var",
+            "doc": "------------------------------------------------------------------ search Rows for the launcher. Matches the action label, its plugin name, its id and its keywords, and treats ever"
+          },
+          {
+            "kind": "property",
+            "name": "recent",
+            "type": "var",
+            "default": "[]",
+            "doc": "------------------------------------------------------------------- audit The last calls made, newest first. What `qs ipc call intent recent` prints, and the fastest way to find ou"
+          },
+          {
+            "kind": "property",
+            "name": "recentLimit",
+            "type": "int",
+            "readonly": true,
+            "default": "40"
+          },
+          {
+            "kind": "function",
+            "name": "parseArgs",
+            "args": "text: string",
+            "returns": "var",
+            "doc": "------------------------------------------------------------------- CLI Parses `key=value key2=\"two words\"` as sent by the IPC target. Quoting is honoured so a value with spaces su"
+          },
+          {
+            "kind": "function",
+            "name": "withPositional",
+            "args": "ref: string, args: var",
+            "returns": "var",
+            "doc": "Resolves __positional against the action's schema. Kept separate from parseArgs so the parser stays a pure string function."
+          }
+        ]
+      },
+      {
+        "name": "PluginLifecycle",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "When plugins should stop doing things.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "locked",
+            "type": "bool",
+            "readonly": true,
+            "default": "GlobalStates.screenLocked",
+            "doc": "------------------------------------------------------------------ state The screen is locked. GlobalStates owns this; the lock screen sets it."
+          },
+          {
+            "kind": "property",
+            "name": "idle",
+            "type": "bool",
+            "readonly": true,
+            "default": "idleMonitor.isIdle",
+            "doc": "No input for `idleSeconds`. Distinct from locked: an idle session may be unlocked with the screen still on, where suspending a timer is right but tearing down state is not."
+          },
+          {
+            "kind": "property",
+            "name": "idleSeconds",
+            "type": "int",
+            "readonly": true,
+            "default": "Config.options?.plugins?.idleSuspendSeconds ?? 180",
+            "doc": "0 disables idle suspension entirely."
+          },
+          {
+            "kind": "property",
+            "name": "powerSaver",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.forcePowerSaver",
+            "doc": "Battery-saver: on battery and either below the threshold or explicitly asked for."
+          },
+          {
+            "kind": "property",
+            "name": "forcePowerSaver",
+            "type": "bool",
+            "default": "false",
+            "doc": "For the settings GUI, and for exercising the contract without draining a battery."
+          },
+          {
+            "kind": "property",
+            "name": "awake",
+            "type": "bool",
+            "readonly": true,
+            "default": "!root.locked && !root.idle",
+            "doc": "The two properties plugins bind to."
+          },
+          {
+            "kind": "property",
+            "name": "animate",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.awake && !root.powerSaver"
+          },
+          {
+            "kind": "property",
+            "name": "pollFactor",
+            "type": "real",
+            "readonly": true,
+            "default": "root.powerSaver ? 5 : 1",
+            "doc": "What to multiply a background poll interval by. A plugin polling every 30 s goes to every 150 s in power-saver rather than stopping, because stale weather is better than no weather"
+          },
+          {
+            "kind": "signal",
+            "name": "suspended",
+            "doc": "---------------------------------------------------------------- signals Stop and release. Emitted on lock and on going idle."
+          },
+          {
+            "kind": "signal",
+            "name": "resumed",
+            "doc": "Start again. Emitted on unlock and on activity."
+          },
+          {
+            "kind": "signal",
+            "name": "aboutToSuspendSystem",
+            "doc": "The machine is about to sleep. Best effort by nature - the shell can be killed without warning - which is why storage writes are coalesced in milliseconds rather than deferred to h"
+          },
+          {
+            "kind": "function",
+            "name": "notifySystemSuspend",
+            "returns": "void",
+            "doc": "---------------------------------------------------------------- system Called by the shell's sleep hook."
+          },
+          {
+            "kind": "function",
+            "name": "describe",
+            "returns": "var",
+            "doc": "------------------------------------------------------------ diagnostics"
           }
         ]
       },
@@ -5697,6 +7293,112 @@
             "args": "title: string, body: string, options: var",
             "returns": "void",
             "doc": "--------------------------------------------------------------- sending options: { icon, urgency: \"low\"|\"normal\"|\"critical\", appName, replaceTag }"
+          }
+        ]
+      },
+      {
+        "name": "PluginPermissions",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "What a plugin is allowed to do, declared in its manifest and revocable by the user.",
+        "members": [
+          {
+            "kind": "property",
+            "name": "known",
+            "type": "var",
+            "readonly": true,
+            "default": "[",
+            "doc": "The permissions a manifest may declare. Anything else is a manifest error, caught by the schema rather than here."
+          },
+          {
+            "kind": "property",
+            "name": "describe",
+            "type": "var",
+            "readonly": true,
+            "default": "("
+          },
+          {
+            "kind": "function",
+            "name": "label",
+            "args": "permission: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "icon",
+            "args": "permission: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "summary",
+            "args": "permission: string",
+            "returns": "string"
+          },
+          {
+            "kind": "function",
+            "name": "declared",
+            "args": "pluginId: string",
+            "returns": "var",
+            "doc": "------------------------------------------------------------- declaration What the manifest asked for."
+          },
+          {
+            "kind": "function",
+            "name": "declares",
+            "args": "pluginId: string, permission: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "granted",
+            "args": "pluginId: string, permission: string",
+            "returns": "bool",
+            "doc": "Stored per plugin under \"permissions\" in plugins.json, as an object of explicit false entries. Absent means granted, so the file stays empty until someone revokes something and a p"
+          },
+          {
+            "kind": "function",
+            "name": "revoked",
+            "args": "pluginId: string, permission: string",
+            "returns": "bool"
+          },
+          {
+            "kind": "function",
+            "name": "set",
+            "args": "pluginId: string, permission: string, allow: bool",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "toggle",
+            "args": "pluginId: string, permission: string",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "grantAll",
+            "args": "pluginId: string",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "check",
+            "args": "pluginId: string, permission: string, what: string",
+            "returns": "bool",
+            "doc": "`what` is for the message the user sees when it is refused - \"gif-picker was not allowed to reach api.tenor.com\" reads better than \"permission denied\"."
+          },
+          {
+            "kind": "property",
+            "name": "used",
+            "type": "var",
+            "default": "({})",
+            "doc": "Permissions actually exercised this session, whether declared or not. doctor.sh reads this over IPC to report manifests that under-declare."
+          },
+          {
+            "kind": "function",
+            "name": "undeclared",
+            "args": "pluginId: string",
+            "returns": "var",
+            "doc": "Permissions a plugin has used without declaring them."
           }
         ]
       },
@@ -6461,6 +8163,90 @@
         ]
       },
       {
+        "name": "PluginResponsive",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Where a plugin's content is currently mounted, so one file can render correctly in five places.",
+        "members": [
+          {
+            "kind": "enum",
+            "name": "Slot",
+            "values": "Unknown, BarPill, Flyout, FloatingWindow, SidebarTab, DesktopWidget, Panel, Settings"
+          },
+          {
+            "kind": "property",
+            "name": "slot",
+            "type": "int",
+            "default": "PluginResponsive.Slot.Unknown",
+            "doc": "Where the content being built right now lives."
+          },
+          {
+            "kind": "property",
+            "name": "slotName",
+            "type": "string",
+            "readonly": true
+          },
+          {
+            "kind": "property",
+            "name": "isCompact",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.slot === PluginResponsive.Slot.BarPill",
+            "doc": "Room for one line and an icon, and nothing else: a bar pill or an OSD."
+          },
+          {
+            "kind": "property",
+            "name": "isNarrow",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.isCompact",
+            "doc": "Room for a few rows, but not for a two-column layout."
+          },
+          {
+            "kind": "property",
+            "name": "isFull",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.slot === PluginResponsive.Slot.FloatingWindow",
+            "doc": "Resizable, keyboard-focusable, worth putting a toolbar in."
+          },
+          {
+            "kind": "property",
+            "name": "orientation",
+            "type": "int",
+            "readonly": true,
+            "doc": "Vertical when the bar is vertical and the content is in it; vertical in a sidebar tab."
+          },
+          {
+            "kind": "property",
+            "name": "vertical",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.orientation === Qt.Vertical"
+          },
+          {
+            "kind": "property",
+            "name": "preferredWidth",
+            "type": "real",
+            "readonly": true,
+            "doc": "A sensible default width for the slot, so content does not have to guess."
+          },
+          {
+            "kind": "function",
+            "name": "enter",
+            "args": "slot: int",
+            "returns": "int",
+            "doc": "Hosts call this around building content. Returns the previous slot so it can be restored - nesting is normal (a bar pill's flyout contains a list whose rows contain buttons), and a"
+          },
+          {
+            "kind": "function",
+            "name": "leave",
+            "args": "previous: int",
+            "returns": "void"
+          }
+        ]
+      },
+      {
         "name": "PluginSearch",
         "kind": "singleton",
         "extends": "Singleton",
@@ -6504,24 +8290,31 @@
         "members": [
           {
             "kind": "property",
-            "name": "stores",
-            "type": "var",
-            "default": "({})",
-            "doc": "pluginId -> store object. Long-lived: identity is what makes `store.values.x` a cheap binding, so stores are created once and never destroyed."
-          },
-          {
-            "kind": "property",
             "name": "loaded",
             "type": "bool",
             "readonly": true,
             "default": "PluginConfig.loaded",
-            "doc": "True once plugins.json has been read. A plugin that *acts* on stored state rather than binding to it has to wait for this, or it acts on empty storage once per startup and overwrit"
+            "doc": "The map lives in Memo.js rather than in a property here. A property would be read *and* written by `of()`, and a plugin calling it from a binding - which is the documented way to u"
           },
           {
             "kind": "function",
             "name": "of",
             "args": "pluginId: string",
             "returns": "var"
+          },
+          {
+            "kind": "function",
+            "name": "collection",
+            "args": "pluginId: string, name: string",
+            "returns": "var",
+            "doc": "Handles are cached per (plugin, key) and never destroyed: the identity is what makes binding to `.list` cheap."
+          },
+          {
+            "kind": "property",
+            "name": "collectionComponent",
+            "type": "Component",
+            "readonly": true,
+            "default": "Component"
           },
           {
             "kind": "property",
@@ -6772,6 +8565,98 @@
         ]
       },
       {
+        "name": "PluginToast",
+        "kind": "singleton",
+        "extends": "Singleton",
+        "summary": "Transient feedback: \"Copied\", \"Saved\", \"Could not reach the API\".",
+        "members": [
+          {
+            "kind": "property",
+            "name": "current",
+            "type": "var",
+            "readonly": true,
+            "default": "(computed)",
+            "doc": "The toast being shown, or null. PluginToastHost binds to this."
+          },
+          {
+            "kind": "property",
+            "name": "visible",
+            "type": "bool",
+            "readonly": true,
+            "default": "root.current !== null"
+          },
+          {
+            "kind": "property",
+            "name": "pending",
+            "type": "int",
+            "readonly": true,
+            "default": "(computed)"
+          },
+          {
+            "kind": "function",
+            "name": "show",
+            "args": "toast: var",
+            "returns": "int",
+            "doc": "  text        the message (required)   tone        \"accent\" (default) | \"success\" | \"error\" | \"notice\"   icon        Material Symbol name; a tone-appropriate default is used otherw"
+          },
+          {
+            "kind": "function",
+            "name": "success",
+            "args": "text: string",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "error",
+            "args": "text: string",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "notice",
+            "args": "text: string",
+            "returns": "int"
+          },
+          {
+            "kind": "function",
+            "name": "replace",
+            "args": "toast: var",
+            "returns": "int",
+            "doc": "Clears anything queued and shows this instead. For a sequence where only the latest state is worth reading."
+          },
+          {
+            "kind": "function",
+            "name": "dismiss",
+            "args": "id: int",
+            "returns": "void",
+            "doc": "---------------------------------------------------------------- dismiss Called by the host when the timer expires, when the toast is clicked away, or by a plugin that no longer wa"
+          },
+          {
+            "kind": "function",
+            "name": "dismissCurrent",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "clear",
+            "returns": "void"
+          },
+          {
+            "kind": "function",
+            "name": "activate",
+            "args": "id: int",
+            "returns": "void",
+            "doc": "Runs the current toast's action and closes it. The host calls this; the callback is guarded because it comes from plugin code and a throw here would take the shell's event loop wit"
+          },
+          {
+            "kind": "function",
+            "name": "iconFor",
+            "args": "tone: string",
+            "returns": "string"
+          }
+        ]
+      },
+      {
         "name": "PluginUtils",
         "kind": "singleton",
         "extends": "Singleton",
@@ -6884,6 +8769,13 @@
             "args": "command: var, input: string, callback: var",
             "returns": "void",
             "doc": "This is what replaces `bash -c \"printf '...' | thing\"`, and the difference is not style: the shell form has to quote the payload, and a clipboard entry is precisely the kind of tex"
+          },
+          {
+            "kind": "function",
+            "name": "as",
+            "args": "pluginId: string",
+            "returns": "var",
+            "doc": "Scopes are cached per plugin so `PluginUtils.as(id)` in a binding does not allocate. Scope cache in Memo.js, not a property: `as()` reads the cache it writes, and a plugin doing th"
           }
         ]
       },
@@ -7539,7 +9431,7 @@
       },
       {
         "name": "GoogleCloud",
-        "summary": "Init load will be handled by Component.onCompleted",
+        "summary": "`?? \"\"` because a string property cannot hold undefined: before the key file is read - and for a key file without a project_id - the optional chain yields undefined and Qt logs \"Un",
         "properties": {
           "keyContent": "var",
           "keyProjectId": "string",
@@ -7753,6 +9645,7 @@
           "userActionScripts": "var",
           "pluginActions": "var",
           "pluginSearchResults": "var",
+          "pluginIntentResults": "var",
           "searchActions": "var",
           "allActions": "var",
           "mathResult": "string",

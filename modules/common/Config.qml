@@ -595,6 +595,25 @@ Singleton {
                 }
             }
 
+            // The plugin platform's own knobs. Everything a *plugin* declares lives in
+            // plugins.json instead; these are the shell-side policies that apply to all of them.
+            property JsonObject plugins: JsonObject {
+                // Seconds of no input after which plugin timers and animations suspend. 0 never
+                // suspends. See core/PluginLifecycle.qml.
+                property int idleSuspendSeconds: 180
+
+                // Battery percentage at or below which plugins enter power-saver behaviour:
+                // animations off, polling slowed by PluginLifecycle.pollFactor.
+                property int powerSaverPercent: 20
+
+                // Blur, glow and mesh gradients. Off is a meaningful setting on an integrated GPU.
+                property bool effects: true
+
+                // Whether a plugin that fails to load draws an error card in its place. Off hides
+                // failures again, which is only wanted for a screenshot.
+                property bool showErrors: true
+            }
+
             property JsonObject overview: JsonObject {
                 property bool enable: true
                 property string style: "default"

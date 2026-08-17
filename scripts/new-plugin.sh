@@ -3,6 +3,8 @@
 #
 #     scripts/new-plugin.sh weather-pill                       # bar widget (default)
 #     scripts/new-plugin.sh notes --type desktop
+#     scripts/new-plugin.sh tasks --type window                # window + panel + IPC + intents
+#     scripts/new-plugin.sh gifs --type picker                 # searchable grid over an HTTP API
 #     scripts/new-plugin.sh units --type search
 #     scripts/new-plugin.sh focus --type toggle
 #     scripts/new-plugin.sh backup --type service
@@ -28,17 +30,21 @@ into="$ROOT/plugins"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        # Both spellings: --type=window is what everyone types first.
+        --type=*) type="${1#--type=}"; shift ;;
+        --name=*) name="${1#--name=}"; shift ;;
+        --into=*) into="${1#--into=}"; shift ;;
         --type) type="${2:?--type needs a value}"; shift 2 ;;
         --name) name="${2:?--name needs a value}"; shift 2 ;;
         --into) into="${2:?--into needs a value}"; shift 2 ;;
-        -h|--help) sed -n '2,20p' "$0" | sed 's|^# \?||'; exit 0 ;;
+        -h|--help) sed -n '2,22p' "$0" | sed 's|^# \?||'; exit 0 ;;
         -*) echo "unknown flag: $1" >&2; exit 1 ;;
         *) id="$1"; shift ;;
     esac
 done
 
 if [[ -z "$id" ]]; then
-    echo "usage: $(basename "$0") <plugin-id> [--type bar|desktop|toggle|service|ipc|search|osd|menu] [--name \"Display Name\"] [--into DIR]" >&2
+    echo "usage: $(basename "$0") <plugin-id> [--type bar|desktop|window|picker|toggle|service|ipc|search|osd|menu] [--name \"Display Name\"] [--into DIR]" >&2
     exit 1
 fi
 
@@ -76,7 +82,21 @@ schemaRef="$(realpath --relative-to="$dir" "$ROOT/core/manifest.schema.json" 2>/
 
 files=""
 
+# The two longest templates live next door: `window` and `picker` are the shapes that exercise
+# the whole SDK - a registry-backed window, HTTP with a cache, a persisted collection, undo,
+# intents - and inlining them here would have made this file mostly heredoc.
+# shellcheck source=scripts/new-plugin-templates.sh
+source "$ROOT/scripts/new-plugin-templates.sh"
+
 case "$type" in
+window)
+    write_window_template
+    ;;
+
+picker)
+    write_picker_template
+    ;;
+
 bar)
     files="${pascal}Widget.qml"
     cat > "$dir/manifest.json" <<EOF
@@ -677,7 +697,7 @@ EOF
 
 *)
     rmdir "$dir"
-    echo "unknown --type \"$type\". One of: bar, desktop, toggle, service, ipc, search, osd, menu" >&2
+    echo "unknown --type \"$type\". One of: bar, desktop, window, picker, toggle, service, ipc, search, osd, menu" >&2
     exit 1
     ;;
 esac

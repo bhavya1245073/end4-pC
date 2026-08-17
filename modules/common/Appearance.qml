@@ -1,9 +1,9 @@
+pragma Singleton
+
 import QtQuick
 import Quickshell
 import qs.modules.common.functions
-pragma Singleton
 pragma ComponentBehavior: Bound
-
 Singleton {
     id: root
     property QtObject m3colors

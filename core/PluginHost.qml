@@ -32,6 +32,7 @@ import QtQuick
 import QtQml
 import Quickshell
 import qs.modules.common
+import qs.services
 
 Scope {
     id: root
@@ -50,6 +51,10 @@ Scope {
     // confirmation, because the caller has already decided to ask.
     PluginDialogHost {}
 
+    // The surface PluginToast.show() draws into, for the same reason: feedback that depends on
+    // an unrelated plugin being switched on is worse than none.
+    PluginToastHost {}
+
     // Singletons are created on first use, and an IpcHandler inside one does not exist
     // until the singleton does - so a shell nobody has touched has no `perf` or `plugins`
     // IPC target. Touching them here registers the targets. The profiler's sampling timer
@@ -57,6 +62,10 @@ Scope {
     Component.onCompleted: {
         Perf.running;
         PluginCommands.objectName;
+        // Same reason: the lifecycle coordinator owns the idle monitor, and nothing binds to
+        // it until a plugin asks - so without this, idle suspension would only start working
+        // once some plugin happened to read it.
+        PluginLifecycle.awake;
     }
 
     // Non-visual, always-on objects (timers, watchers, IPC handlers).
@@ -122,5 +131,23 @@ Scope {
                 descriptor: modelData
             }
         }
+    }
+
+    // Undo and redo for everything any plugin recorded. Core rather than per-plugin: the user
+    // has one idea of "what did I just do", and a per-plugin binding would make Ctrl+Z depend
+    // on which surface happened to have focus. See core/PluginHistory.qml.
+    //
+    // Bound in the compositor config as `quickshell:undo` / `quickshell:redo`, like every other
+    // shell shortcut, so the keys stay the user's choice.
+    CompositorGlobalShortcut {
+        name: "undo"
+        description: "Undo the last plugin action"
+        onPressed: PluginHistory.undo()
+    }
+
+    CompositorGlobalShortcut {
+        name: "redo"
+        description: "Redo the last undone plugin action"
+        onPressed: PluginHistory.redo()
     }
 }

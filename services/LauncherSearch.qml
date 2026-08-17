@@ -174,6 +174,29 @@ Singleton {
         }
     }))
 
+    // Actions plugins declared in their manifests, matched by name. `PluginIntent.match`
+    // decides what matches and fills in the trailing words as the action's first argument, so
+    // typing "gif cat" runs the search rather than opening a picker to type it again.
+    //
+    // Only rows that are `ready` are executable: an action whose required argument has not been
+    // typed yet is still shown, so the user learns it exists and what it wants, but activating
+    // it puts the action name in the query instead of running it half-specified.
+    property var pluginIntentResults: PluginIntent.match(root.query).map(row => resultComp.createObject(null, {
+        name: row.name ?? "",
+        type: row.subtitle ?? "",
+        verb: row.ready ? Translation.tr("Run") : Translation.tr("Type"),
+        iconName: row.icon ?? "bolt",
+        iconType: LauncherSearchResult.IconType.Material,
+        execute: () => {
+            if (row.ready) {
+                PluginIntent.invoke(row.ref, row.args);
+                root.query = "";
+            } else {
+                root.query = `${row.name} `;
+            }
+        }
+    }))
+
     property var searchActions: [
         {
             action: "accentcolor",
@@ -568,6 +591,11 @@ Singleton {
         // query, which is a stronger signal than a fuzzy name match. A provider that
         // should not outrank apps sets a higher `order` and is sorted among the others.
         result = root.pluginSearchResults.concat(result);
+        ////////////// Plugin intents //////////
+        // Declared actions, matched by name. Above apps for the same reason as providers, and
+        // below them because a provider answered *this* query while an intent matched its own
+        // name. See core/PluginIntent.qml.
+        result = root.pluginIntentResults.concat(result);
         ////////////// Settings ////////////////
         result = result.concat(settingsResults);
         ////////// Launcher actions ////////////

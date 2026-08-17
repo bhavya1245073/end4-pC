@@ -76,6 +76,17 @@ rebuilding and reading `qs log` (see **Verify**).
 
 ## The 60-second plugin
 
+Don't hand-write one. The scaffolder emits a working plugin, and the two richest templates
+show the whole SDK:
+
+```bash
+scripts/new-plugin.sh tasks --type=window   # window + panel + bar pill + IPC + intents + keybind + undo
+scripts/new-plugin.sh gifs  --type=picker   # PluginContentView over PluginHttp, with a persisted collection
+scripts/new-plugin.sh hi                    # a bar widget, the smallest useful thing
+```
+
+Every template is validated on the way out. What one looks like by hand:
+
 ```
 plugins/hello/
 ├── manifest.json
@@ -127,7 +138,20 @@ GUI is generated from it, so there is no settings UI to write.
 
 Both produce a single line in `qs log` and an otherwise working shell. Both are
 caught by `scripts/check-qml.sh` (phases 2 and 3). Neither is obvious from reading
-your own code. Phases 4–6 catch three more of the same character — see **Verify**.
+your own code. Phases 4–10 catch more of the same character — see **Verify**.
+
+A third belongs beside them, because it is the one that bites hardest and no compile
+catches it: **a `pragma Singleton` file with no `qmldir` line still resolves** — as the
+*type*, not the instance. Every call on it then fails with `is not a function` and every
+property reads `undefined`. Two lines fix it, and `scripts/new-plugin.sh` now writes them:
+
+```
+# plugins/my-plugin/qmldir
+singleton MyState 1.0 MyState.qml
+```
+
+And the pragma must be on **line 1** — the scanner gives up at the first `{`, including one
+inside a comment above it.
 
 ### 1. A `qs.*` module only a plugin imports is not registered
 
@@ -264,11 +288,33 @@ injection. Every one of these is a singleton in `qs.core`:
 | read or write a file | `PluginFs`, `PluginFsWatch` |
 | any kind of timer | `PluginTimer.after/every/debounce/throttle/cron/at` |
 | remember something between runs | `PluginStore` / `PluginStorage` |
-| talk to another plugin | `PluginBus` / `PluginBusListener` |
-| clipboard, notify, HTTP, run a command | `PluginUtils.copy/notify/fetchJson/run/pipe/copyFile` |
+| talk to another plugin | `PluginBus` / `PluginBusListener`, or `PluginIntent.call("other:action", args)` to invoke it |
+| HTTP with a cache, a timeout and cancellation | `PluginHttp.get/post` — never `curl`, never bare `XMLHttpRequest` |
+| "Copied", "Saved", "Could not reach the API" | `PluginToast.show/success/error/notice` |
+| undo for something destructive | `PluginHistory.recordWithToast({ label, undo, redo })` |
+| what the user is doing right now | `PluginContext.focusedApp`, `.selectedText`, `.clipboard`, `.activeMonitor` |
+| should I be running at all | `PluginLifecycle.awake`, `.animate`, `.pollFactor` |
+| a list of favourites/pins/recents | `PluginStorage.collection(id, key)` — `add`/`toggle`/`has`/`list`/`clear` |
+| everything above, with permissions checked | `PluginUtils.as(pluginId)` — a scoped facade |
+| clipboard, notify, run a command | `PluginUtils.copy/notify/run/pipe/copyFile` |
 
 `scripts/api.sh <name>` prints any of them in full, from the generated catalogue in
 `core/api.json`. Check there before writing a `Process`.
+
+Prefer the scoped facade in plugin code:
+
+```qml
+readonly property var utils: PluginUtils.as("my-plugin")
+
+utils.get(url, { cacheTtl: 60000, owner: root }, r => ...)   // needs "network"
+utils.copy(text)                                              // needs "clipboard"
+utils.toast(qsTr("Copied"))
+utils.record(qsTr("Cleared"), { undo: restore, redo: clear })
+utils.collection("favourites").toggle(item)
+```
+
+It carries the plugin id, so the `permissions` in the manifest are actually enforced and a
+refused call names who was refused.
 
 If you do need to run something: `PluginUtils.run(argv, callback)` for output,
 `PluginUtils.pipe(argv, payload, callback)` to feed it stdin. Never build a shell
@@ -394,6 +440,13 @@ All in `qs.core`, all themed, none of them needing styling from you:
 
 | Type | For |
 | --- | --- |
+| `PluginContentView` | **the one to reach for** — grid/list/detail over a list of things, with debounced search, category chips, arrow keys, hover actions, progressive images, empty and loading states |
+| `PluginProgressiveImage` | still thumbnail now, animated preview on hover, decoded at draw size |
+| `PluginErrorBoundary` | loads plugin QML and draws the error where the plugin should have been |
+| `PluginDropTarget`, `PluginDraggable` | accept drops (decoded paths, correct highlight) and drag out into other applications |
+| `PluginSurface` | one file for bar pill / flyout / full window; the host picks the slot |
+| `PluginBackdropBlur`, `PluginGlowBorder`, `PluginMeshGradient` | blur of the shell's wallpaper, a focus/drag glow, an animated palette gradient |
+| `PluginIntentHandler` | implements a declared action, when an IPC function of the same name is not the shape you want |
 | `PluginDrawer` | a panel sliding in from an edge, optionally reserving space |
 | `PluginFloatingWindow` | movable, resizable, geometry remembered across restarts |
 | `PluginHud` | a transient overlay — `flash()` and it fades itself out |
@@ -440,6 +493,17 @@ Every kind is an array under `provides`. Each entry needs an `id`; most need
 | `contextMenuItems` | a row in the desktop right-click menu | `label`, `icon`, `order`, and one of `panel` / `ipc` / `exec` / `url` / `entry`; `badge` names a bus topic |
 | `osdIndicators` | an OSD of your own, raised with `OsdRegistry.show()` | — |
 | `sidebarTabs` | a full-height tab in the left sidebar | `label`, `icon`, `order`, `requires` |
+| `actions` | something the plugin can be asked to do, reachable from the launcher, a keybind, the CLI and other plugins | `label`, `description`, `icon`, `keywords`, `schema` |
+
+And one top-level key beside `provides`:
+
+| Key | What it does |
+| --- | --- |
+| `permissions` | `network`, `clipboard`, `storage`, `system-exec`, `notifications`, `window-manager`. Shown to the user before they enable the plugin, revocable afterwards, and enforced for anything routed through `PluginUtils.as(id)` or `PluginHttp`. |
+
+An `actions` entry needs no separate implementation if the plugin already exposes an IPC
+function of the same name — declaring it is enough. Arguments are validated against `schema`
+first, so the function can read them without guarding.
 
 `settingsSections` is how a plugin's settings sit next to the related built-in
 ones *and disappear when the plugin is switched off*. Host pages render
@@ -579,12 +643,21 @@ share. (Check the name against `services/` first — see failure mode 2.)
 ## Verify
 
 ```bash
-scripts/check-qml.sh              # all six phases
+scripts/doctor.sh                 # start here - manifests, singletons, icons, api, compile, live shell
+scripts/doctor.sh --quick         # ~2s: everything that does not need a shell
+scripts/doctor.sh --plugin gifs   # one plugin
+
+scripts/check-qml.sh              # all ten phases
 scripts/check-qml.sh plugins      # one subtree (phases 1 and 3 only)
 scripts/check-icons.sh            # Material Symbol names vs the font
 ```
 
-Expect exit 0. Six phases, and you need to know why each exists — every one after
+`doctor.sh` is the one to run. It wraps the others and adds the checks that need a
+*running* shell, which is where a whole class of failure only ever shows up: an action
+declared with no handler, a permission used but not declared, a singleton that resolved to a
+type. Static checks pass on all three.
+
+Expect exit 0. Ten phases, and you need to know why each exists — every one after
 the first was added because a bug got through the ones before it:
 
 1. **Every file compiled individually.** Catches syntax and missing types. *Can

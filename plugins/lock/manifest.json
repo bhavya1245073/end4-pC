@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "description": "Lock screen with clock, media, notifications and authentication.",
+  "permissions": [
+    "system-exec"
+  ],
   "author": "illogical-impulse",
   "icon": "lock",
   "enabledByDefault": true,

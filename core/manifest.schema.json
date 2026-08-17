@@ -84,6 +84,21 @@
       },
       "description": "nixpkgs attribute names put on the shell's PATH. Resolved at build time by modules/home/quickshell/default.nix; a name that does not exist fails the rebuild rather than the plugin. Use packageOverrides there when the attribute name differs."
     },
+    "permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Capabilities the plugin uses, shown to the user in Settings -> Plugins before they switch it on and revocable there afterwards. A revoked permission makes the matching facade refuse: PluginHttp for network, PluginUtils.run/exec/pipe for system-exec, the clipboard helpers for clipboard. Not a sandbox - QML plugin code runs in the shell's process - but an honest statement of intent with a working off switch. Undeclared use is allowed and reported by scripts/doctor.sh rather than blocked, so this can be adopted without breaking existing plugins.",
+      "items": {
+        "enum": [
+          "network",
+          "clipboard",
+          "storage",
+          "system-exec",
+          "notifications",
+          "window-manager"
+        ]
+      }
+    },
     "provides": {
       "type": "object",
       "additionalProperties": false,
@@ -172,6 +187,12 @@
           "items": {
             "$ref": "#/definitions/sidebarTab"
           }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/action"
+          }
         }
       }
     },
@@ -184,6 +205,76 @@
     }
   },
   "definitions": {
+    "action": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "description": "Something the plugin can be asked to do, reachable from the launcher, the command line (`qs ipc call intent call \"plugin:action\"`), a keybind, a context menu and other plugins (PluginIntent.call). Implement it with a PluginIntentHandler in a file the plugin already loads - its service is the usual place. Arguments are validated against `schema` before the handler runs.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9-]*$",
+          "description": "Referred to as pluginId:actionId everywhere."
+        },
+        "label": {
+          "type": "string",
+          "description": "What the launcher shows. Defaults to the id."
+        },
+        "description": {
+          "type": "string"
+        },
+        "icon": {
+          "$ref": "#/definitions/materialSymbol"
+        },
+        "keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Extra words the launcher matches, for an action whose name is not what a user would type."
+        },
+        "schema": {
+          "type": "object",
+          "description": "Named arguments. The first required one - or the first declared one - receives whatever the user typed after the action name in the launcher, and a bare value on the command line.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "enum": [
+                  "string",
+                  "int",
+                  "real",
+                  "bool",
+                  "path"
+                ],
+                "default": "string",
+                "description": "Values arriving over IPC are strings and are coerced to this. `path` is also expanded, so ~ and relative paths reach the handler absolute."
+              },
+              "required": {
+                "type": "boolean",
+                "default": false
+              },
+              "default": {
+                "description": "Used when the argument is absent or empty."
+              },
+              "oneOf": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Permitted values. Anything else is refused before the handler runs."
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
     "materialSymbol": {
       "type": "string",
       "pattern": "^[a-z0-9_]+$",

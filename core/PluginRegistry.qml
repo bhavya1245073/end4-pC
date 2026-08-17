@@ -278,8 +278,29 @@ Singleton {
         //
         // Deferred because the widget's own settings write and this one would otherwise
         // race through PluginConfig's write coalescing.
-        if (enabled)
+        if (enabled) {
             Qt.callLater(() => BarWidgetRegistry.autoPlace(pluginId));
+            return;
+        }
+
+        // Switching off has to reach the things that outlive the plugin's own objects. All three
+        // of these hold callbacks or closures into QML that is about to be destroyed, and none of
+        // them can notice on their own:
+        //
+        //   - an HTTP response landing in a callback whose owner is gone
+        //   - an undo entry whose closure restores state into a torn-down singleton
+        //   - an intent handler still registered for a plugin that is no longer running
+        //
+        // Deferred for the same reason as autoPlace: this runs from a GUI signal handler, and
+        // PluginConfig has a write in flight.
+        Qt.callLater(() => {
+            PluginHttp.cancelFor(pluginId);
+            PluginHistory.forget(pluginId);
+            for (const ref of PluginIntent.refs()) {
+                if (ref.startsWith(`${pluginId}:`))
+                    PluginIntent.unregister(ref);
+            }
+        });
     }
 
     // Plugins may declare `requires.compositor: ["hyprland"]`, and are skipped

@@ -12,6 +12,22 @@
 // so reading and writing them during a binding is invisible and safe. The library is
 // shared by every file that imports it, which is what makes the cache global.
 
+// Handle caches for stores and collections.
+//
+// These are plain JS variables, not properties on the singleton, for the same reason the memo
+// caches below are: `PluginStorage.of(id)` has to read the cache it also writes, and a QML
+// property read-then-written during a binding evaluation is a dependency cycle. Written the
+// obvious way - `property var stores` reassigned inside `of()` - every plugin that did the
+// natural thing
+//
+//     readonly property var store: PluginStorage.of("tasks")
+//
+// got "Binding loop detected for property store" and Qt dropped the binding, so the plugin's
+// state silently stopped updating.
+var stores = ({});
+var collections = ({});
+var scopes = ({});
+
 var store = ({});
 var signatures = ({});
 var indexStore = ({});

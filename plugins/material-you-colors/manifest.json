@@ -4,6 +4,10 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "description": "Applies the wallpaper palette to KDE/Qt apps, Konsole, KSyntaxHighlighting, window decorations and terminals. Every setting here is re-read by the wallpaper switcher too, so it stays in effect on the next wallpaper change.",
+  "permissions": [
+    "system-exec",
+    "notifications"
+  ],
   "author": "bhavya",
   "icon": "palette",
   "enabledByDefault": true,

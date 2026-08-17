@@ -1,3 +1,5 @@
+pragma Singleton
+
 // Everything derived from the battery, in one place.
 //
 // The bar widget, its popup and the desktop widget all need to answer the same
@@ -8,8 +10,6 @@
 // Thresholds come from the shell's own battery config rather than this plugin's
 // settings, so the widget turns red at the same level that the OSD warns and the
 // suspend logic arms. Two sets of thresholds would be worse than none.
-
-pragma Singleton
 
 import Quickshell
 import QtQuick

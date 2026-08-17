@@ -1,5 +1,6 @@
-pragma ComponentBehavior: Bound
 pragma Singleton
+
+pragma ComponentBehavior: Bound
 import qs.modules.common
 import qs.modules.common.utils
 import qs.modules.common.functions
@@ -9,7 +10,6 @@ import QtQuick
 import QtQuick.Controls
 import Qt.labs.synchronizer
 import Quickshell
-
 Singleton {
     id: root
 

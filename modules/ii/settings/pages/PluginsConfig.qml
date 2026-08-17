@@ -30,6 +30,20 @@ ContentPage {
         return Array.isArray(declared) ? declared : [];
     }
 
+    // Declared permissions, and the ones the plugin has used without declaring. Both read from
+    // PluginPermissions rather than from the manifest directly, so the page shows the same thing
+    // the facades enforce.
+    readonly property var pluginPermissions: page.openPlugin === "" ? [] : PluginPermissions.declared(page.openPlugin)
+    readonly property var undeclaredPermissions: page.openPlugin === "" ? [] : PluginPermissions.undeclared(page.openPlugin)
+
+    // Declared actions, tagged with their `ref` so the row can print the command line.
+    readonly property var pluginActions: {
+        const declared = page.openManifest?.provides?.actions;
+        if (!Array.isArray(declared))
+            return [];
+        return declared.map(action => Object.assign({ ref: `${page.openPlugin}:${action.id}` }, action));
+    }
+
     property string filter: ""
 
     readonly property var visiblePlugins: {
@@ -406,6 +420,67 @@ ContentPage {
                 }
             }
 
+            // What the plugin is allowed to do. Shown before the enable switch on purpose: the
+            // point of declaring permissions is that they can be read *before* switching
+            // something on, not discovered afterwards.
+            ContentSection {
+                icon: "shield"
+                shape: MaterialShape.Shape.Cookie7Sided
+                title: Translation.tr("Permissions")
+                visible: page.pluginPermissions.length > 0 || page.undeclaredPermissions.length > 0
+
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    text: Translation.tr("Switching one off makes the shell refuse those calls. Plugin code runs in the shell's process, so this is a working off switch rather than a sandbox.")
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    wrapMode: Text.Wrap
+                }
+
+                Repeater {
+                    model: page.pluginPermissions
+
+                    delegate: ConfigSwitch {
+                        required property string modelData
+
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8
+
+                        buttonIcon: PluginPermissions.icon(modelData)
+                        text: `${PluginPermissions.label(modelData)} \u2014 ${PluginPermissions.summary(modelData)}`
+                        checked: page.openPlugin !== "" && PluginPermissions.granted(page.openPlugin, modelData)
+
+                        // Deferred for the same reason the enable switch is: PluginPermissions.set
+                        // writes plugins.json, which recomputes `checked` above - and doing that
+                        // inside the handler is a write during a binding evaluation.
+                        onCheckedChanged: {
+                            if (page.openPlugin === "")
+                                return;
+                            const target = this.checked;
+                            const plugin = page.openPlugin;
+                            const permission = modelData;
+                            Qt.callLater(() => {
+                                if (PluginPermissions.granted(plugin, permission) !== target)
+                                    PluginPermissions.set(plugin, permission, target);
+                            });
+                        }
+                    }
+                }
+
+                // Permissions the plugin has actually exercised without declaring them. Not an
+                // error - undeclared use is allowed so this could be added without breaking
+                // existing plugins - but worth showing, because the manifest is what the user
+                // reads before trusting it.
+                NoticeBox {
+                    Layout.fillWidth: true
+                    visible: page.undeclaredPermissions.length > 0
+                    text: Translation.tr("Used without declaring: %1. The manifest should list these.")
+                        .arg(page.undeclaredPermissions.map(permission => PluginPermissions.label(permission)).join(", "))
+                }
+            }
+
             // Keybinds the plugin declares. Nothing binds a key for you, so listing
             // them is the difference between a usable shortcut and one the user has no
             // way of discovering.
@@ -437,6 +512,47 @@ ContentPage {
                         icon: "keyboard_command_key"
                         label: modelData.description ?? modelData.id ?? modelData.name ?? ""
                         value: `quickshell:${modelData.id ?? modelData.name ?? ""}`
+                    }
+                }
+            }
+
+            // Actions the plugin declares, with how to call each one. A plugin can be scripted
+            // from a terminal or bound to a key without reading its source, which is the whole
+            // point of declaring actions - but only if the invocation is written down somewhere.
+            ContentSection {
+                icon: "bolt"
+                shape: MaterialShape.Shape.Cookie7Sided
+                title: Translation.tr("Actions")
+                visible: page.pluginActions.length > 0
+
+                StyledText {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    text: Translation.tr("Callable from the launcher, from another plugin, and from a terminal.")
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    wrapMode: Text.Wrap
+                }
+
+                Repeater {
+                    model: page.pluginActions
+
+                    delegate: PluginRow {
+                        required property var modelData
+
+                        Layout.leftMargin: 8
+                        Layout.rightMargin: 8
+
+                        icon: modelData.icon ?? "bolt"
+                        label: modelData.label ?? modelData.id ?? ""
+                        // The exact command line, arguments included, ready to be copied.
+                        value: {
+                            const args = Object.keys(modelData.schema ?? {})
+                                .map(name => modelData.schema[name]?.required === true ? `${name}=\u2026` : `[${name}=\u2026]`)
+                                .join(" ");
+                            return `intent call ${modelData.ref}${args ? ` '${args}'` : ""}`;
+                        }
                     }
                 }
             }

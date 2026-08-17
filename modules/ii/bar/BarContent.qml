@@ -30,13 +30,6 @@ Item {
     readonly property var effectiveMiddleLayout: filterLayout(Config.options.bar.layouts.middleLayout)
     readonly property var effectiveRightLayout:  filterLayout(Config.options.bar.layouts.rightLayout)
 
-    // Resolves a layout entry to a QML file. Plugin-provided widgets are looked
-    // up first, so a plugin can both add new widgets and replace a stock one by
-    // reusing its id.
-    function getWidgetUrl(name) {
-        return BarWidgetRegistry.url(name);
-    }
-
     function getMirroredForIndex(layout, idx) {
         const prevCount = layout.slice(0, idx).filter(w => w === "visualizer").length
         return prevCount % 2 === 1
@@ -136,13 +129,12 @@ Item {
                             totalCount: root.effectiveLeftLayout.length
                             paintMaterialPill: root.shouldPaintMaterialPill(modelData)
                             bgColor: root.getMaterialPillColor(modelData)
-                            Loader {
+                            BarWidgetSlot {
                                 Layout.fillHeight: true
-                                source: root.getWidgetUrl(modelData)
-                                onLoaded: {
-                                    if (item && item.acceptsMirroring === true)
-                                        item.mirrored = root.getMirroredForIndex(root.effectiveLeftLayout, index)
-                                }
+                                widgetName: modelData
+                                layoutModel: root.effectiveLeftLayout
+                                layoutIndex: index
+                                mirrored: root.getMirroredForIndex(root.effectiveLeftLayout, index)
                             }
                         }
                     }
@@ -167,28 +159,26 @@ Item {
                         Layout.fillHeight: true
                         currentIndex: index
                         totalCount: root.effectiveLeftLayout.length
-                        Loader {
+                        BarWidgetSlot {
                             Layout.fillHeight: true
-                            source: root.getWidgetUrl(modelData)
-                            onLoaded: {
-                                if (item && item.acceptsMirroring === true)
-                                    item.mirrored = root.getMirroredForIndex(root.effectiveLeftLayout, index)
-                            }
+                            widgetName: modelData
+                            layoutModel: root.effectiveLeftLayout
+                            layoutIndex: index
+                            mirrored: root.getMirroredForIndex(root.effectiveLeftLayout, index)
                         }
                     }
                 }
 
                 Component {
                     id: leftNoGroupDelegate
-                    Loader {
+                    BarWidgetSlot {
                         Layout.fillHeight: false
                         Layout.topMargin: Config.options.bar.bottom ? -5 : 3
                         Layout.alignment: Qt.AlignVCenter
-                        source: root.getWidgetUrl(modelData)
-                        onLoaded: {
-                            if (item && item.acceptsMirroring === true)
-                                item.mirrored = root.getMirroredForIndex(root.effectiveLeftLayout, index)
-                        }
+                        widgetName: modelData
+                        layoutModel: root.effectiveLeftLayout
+                        layoutIndex: index
+                        mirrored: root.getMirroredForIndex(root.effectiveLeftLayout, index)
                     }
                 }
             }
@@ -229,13 +219,12 @@ Item {
                             totalCount: root.effectiveMiddleLayout.length
                             paintMaterialPill: root.shouldPaintMaterialPill(modelData)
                             bgColor: root.getMaterialPillColor(modelData)
-                            Loader {
+                            BarWidgetSlot {
                                 Layout.fillHeight: true
-                                source: root.getWidgetUrl(modelData)
-                                onLoaded: {
-                                    if (item && item.acceptsMirroring === true)
-                                        item.mirrored = root.getMirroredForIndex(root.effectiveMiddleLayout, index)
-                                }
+                                widgetName: modelData
+                                layoutModel: root.effectiveMiddleLayout
+                                layoutIndex: index
+                                mirrored: root.getMirroredForIndex(root.effectiveMiddleLayout, index)
                             }
                         }
                     }
@@ -260,27 +249,25 @@ Item {
                         Layout.fillHeight: true
                         currentIndex: index
                         totalCount: root.effectiveMiddleLayout.length
-                        Loader {
+                        BarWidgetSlot {
                             Layout.fillHeight: true
-                            source: root.getWidgetUrl(modelData)
-                            onLoaded: {
-                                if (item && item.acceptsMirroring === true)
-                                    item.mirrored = root.getMirroredForIndex(root.effectiveMiddleLayout, index)
-                            }
+                            widgetName: modelData
+                            layoutModel: root.effectiveMiddleLayout
+                            layoutIndex: index
+                            mirrored: root.getMirroredForIndex(root.effectiveMiddleLayout, index)
                         }
                     }
                 }
 
                 Component {
                     id: middleNoGroupDelegate
-                    Loader {
+                    BarWidgetSlot {
                         Layout.fillHeight: false
                         Layout.topMargin: Config.options.bar.bottom ? -5 : 3
-                        source: root.getWidgetUrl(modelData)
-                        onLoaded: {
-                            if (item && item.acceptsMirroring === true)
-                                item.mirrored = root.getMirroredForIndex(root.effectiveMiddleLayout, index)
-                        }
+                        widgetName: modelData
+                        layoutModel: root.effectiveMiddleLayout
+                        layoutIndex: index
+                        mirrored: root.getMirroredForIndex(root.effectiveMiddleLayout, index)
                     }
                 }
             }
@@ -322,13 +309,12 @@ Item {
                             totalCount: root.effectiveRightLayout.length
                             paintMaterialPill: root.shouldPaintMaterialPill(modelData)
                             bgColor: root.getMaterialPillColor(modelData)
-                            Loader {
+                            BarWidgetSlot {
                                 Layout.fillHeight: true
-                                source: root.getWidgetUrl(modelData)
-                                onLoaded: {
-                                    if (item && item.acceptsMirroring === true)
-                                        item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index)
-                                }
+                                widgetName: modelData
+                                layoutModel: root.effectiveRightLayout
+                                layoutIndex: index
+                                mirrored: root.getMirroredForIndex(root.effectiveRightLayout, index)
                             }
                         }
                     }
@@ -353,27 +339,25 @@ Item {
                         Layout.fillHeight: true
                         currentIndex: index
                         totalCount: root.effectiveRightLayout.length
-                        Loader {
+                        BarWidgetSlot {
                             Layout.fillHeight: true
-                            source: root.getWidgetUrl(modelData)
-                            onLoaded: {
-                                if (item && item.acceptsMirroring === true)
-                                    item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index)
-                            }
+                            widgetName: modelData
+                            layoutModel: root.effectiveRightLayout
+                            layoutIndex: index
+                            mirrored: root.getMirroredForIndex(root.effectiveRightLayout, index)
                         }
                     }
                 }
 
                 Component {
                     id: rightNoGroupDelegate
-                    Loader {
+                    BarWidgetSlot {
                         Layout.fillHeight: false
                         Layout.topMargin: Config.options.bar.bottom ? -5 : 3
-                        source: root.getWidgetUrl(modelData)
-                        onLoaded: {
-                            if (item && item.acceptsMirroring === true)
-                                item.mirrored = root.getMirroredForIndex(root.effectiveRightLayout, index)
-                        }
+                        widgetName: modelData
+                        layoutModel: root.effectiveRightLayout
+                        layoutIndex: index
+                        mirrored: root.getMirroredForIndex(root.effectiveRightLayout, index)
                     }
                 }
             }

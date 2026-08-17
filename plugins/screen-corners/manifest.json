@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "description": "Rounded corner overlays on every screen.",
+  "permissions": [
+    "window-manager"
+  ],
   "author": "illogical-impulse",
   "icon": "rounded_corner",
   "enabledByDefault": true,

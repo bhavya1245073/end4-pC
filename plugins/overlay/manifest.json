@@ -1,27 +1,31 @@
 {
-    "id": "overlay",
-    "name": "Overlay Widgets",
-    "version": "1.0.0",
-    "apiVersion": 1,
-    "description": "Movable overlay widgets: crosshair, volume mixer, recorder, resources, notes, FPS limiter and floating images.",
-    "author": "illogical-impulse",
-    "icon": "widgets",
-    "enabledByDefault": true,
-    "provides": {
-        "panels": [
-            {
-                "id": "overlay",
-                "entry": "Overlay.qml",
-                "group": "overlay"
-            }
-        ],
-        "settingsSections": [
-            {
-                "id": "overlay",
-                "page": "Interface",
-                "entry": "OverlaySettings.qml",
-                "order": 40
-            }
-        ]
-    }
+  "id": "overlay",
+  "name": "Overlay Widgets",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Movable overlay widgets: crosshair, volume mixer, recorder, resources, notes, FPS limiter and floating images.",
+  "permissions": [
+    "clipboard",
+    "system-exec"
+  ],
+  "author": "illogical-impulse",
+  "icon": "widgets",
+  "enabledByDefault": true,
+  "provides": {
+    "panels": [
+      {
+        "id": "overlay",
+        "entry": "Overlay.qml",
+        "group": "overlay"
+      }
+    ],
+    "settingsSections": [
+      {
+        "id": "overlay",
+        "page": "Interface",
+        "entry": "OverlaySettings.qml",
+        "order": 40
+      }
+    ]
+  }
 }

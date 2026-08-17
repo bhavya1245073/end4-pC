@@ -8,7 +8,10 @@ Singleton {
     id: root
 
     property var keyContent: ({})
-    property string keyProjectId: keyContent?.project_id
+    // `?? ""` because a string property cannot hold undefined: before the key file is read - and
+    // for a key file without a project_id - the optional chain yields undefined and Qt logs
+    // "Unable to assign [undefined] to QString" on every start.
+    property string keyProjectId: keyContent?.project_id ?? ""
     property bool keyError: false
     property bool keyReady: false
     property string token: ""

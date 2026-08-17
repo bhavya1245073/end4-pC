@@ -120,6 +120,12 @@ Singleton {
         return root.find(id)?.name ?? id;
     }
 
+    // Which plugin owns a widget, or "" for a built-in. Used to attribute a load failure to the
+    // plugin rather than to the bar, and to offer "turn it off" in the error card.
+    function pluginIdOf(id: string): string {
+        return root.find(id)?.pluginId ?? "";
+    }
+
     function repeatable(id: string): bool {
         return root.find(id)?.repeatable ?? false;
     }

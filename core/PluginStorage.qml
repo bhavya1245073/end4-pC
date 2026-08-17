@@ -26,13 +26,18 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import qs.core
+import "Memo.js" as Memo
 
 Singleton {
     id: root
 
     // pluginId -> store object. Long-lived: identity is what makes `store.values.x` a
     // cheap binding, so stores are created once and never destroyed.
-    property var stores: ({})
+    //
+    // The map lives in Memo.js rather than in a property here. A property would be read *and*
+    // written by `of()`, and a plugin calling it from a binding - which is the documented way to
+    // use it - would then be a dependency cycle: "Binding loop detected for property store", and
+    // Qt drops the binding. See the note in core/Memo.js.
 
     // True once plugins.json has been read. A plugin that *acts* on stored state rather
     // than binding to it has to wait for this, or it acts on empty storage once per
@@ -40,15 +45,188 @@ Singleton {
     readonly property bool loaded: PluginConfig.loaded
 
     function of(pluginId: string): var {
-        let existing = root.stores[pluginId];
+        let existing = Memo.stores[pluginId];
         if (existing)
             return existing;
         existing = storeComponent.createObject(root, { pluginId: pluginId });
-        root.stores[pluginId] = existing;
-        // Object.assign so the change is visible to anything iterating `stores`; the
-        // individual store objects keep their identity.
-        root.stores = Object.assign({}, root.stores);
+        Memo.stores[pluginId] = existing;
         return existing;
+    }
+
+    // ------------------------------------------------------------ collections
+    //
+    // A named list, as one object with the five verbs every list of favourites, pins, recents
+    // and parked files needs:
+    //
+    //     readonly property var favourites: PluginStorage.collection("gif-picker", "favourites")
+    //
+    //     favourites.toggle({ id: url, url: url, at: Date.now() })
+    //     favourites.has(url)
+    //     favourites.list          // reactive: bind to it directly
+    //     favourites.count
+    //     favourites.clear()
+    //
+    // The store's own list functions do all of this already, and are the right tool when the
+    // key is dynamic or the plugin wants several lists. This exists because `store.list(name)`
+    // is a *function call* - QML re-runs it whenever anything in the store changes and cannot
+    // tell that an unrelated key moved, so a favourites grid rebuilt on every write to any
+    // key. `collection.list` is a property bound to one key, so a delegate reading it is
+    // invalidated only when that key changes.
+    //
+    // Handles are cached per (plugin, key) and never destroyed: the identity is what makes
+    // binding to `.list` cheap.
+
+    function collection(pluginId: string, name: string): var {
+        const key = `${pluginId}|${name}`;
+        let existing = Memo.collections[key];
+        if (existing)
+            return existing;
+        existing = collectionComponent.createObject(root, { pluginId: pluginId, name: name });
+        Memo.collections[key] = existing;
+        return existing;
+    }
+
+    readonly property Component collectionComponent: Component {
+        QtObject {
+            id: handle
+
+            property string pluginId: ""
+            property string name: ""
+
+            readonly property var store: PluginStorage.of(handle.pluginId)
+
+            // Bound to one key of one plugin's storage. This is the whole reason the handle
+            // exists.
+            readonly property var list: {
+                const value = handle.store.values[handle.name];
+                return Array.isArray(value) ? value : [];
+            }
+
+            readonly property int count: handle.list.length
+            readonly property bool empty: handle.count === 0
+
+            // How an entry is identified: its `id` field, or the value itself for a list of
+            // plain strings. Both are common - favourites are objects, recent searches are
+            // strings - and requiring objects would push the same three lines into every
+            // plugin.
+            function keyOf(item: var): var {
+                if (item !== null && typeof item === "object")
+                    return item.id ?? JSON.stringify(item);
+                return item;
+            }
+
+            function has(idOrItem: var): bool {
+                const key = handle.keyOf(idOrItem);
+                return handle.list.some(entry => handle.keyOf(entry) === key);
+            }
+
+            function find(idOrItem: var): var {
+                const key = handle.keyOf(idOrItem);
+                return handle.list.find(entry => handle.keyOf(entry) === key) ?? null;
+            }
+
+            function indexOf(idOrItem: var): int {
+                const key = handle.keyOf(idOrItem);
+                return handle.list.findIndex(entry => handle.keyOf(entry) === key);
+            }
+
+            // Newest first, de-duplicated, capped. Prepends because every list like this is
+            // read from the top.
+            function add(item: var, limit: int): void {
+                const key = handle.keyOf(item);
+                handle.store.update(handle.name, current => {
+                    const list = Array.isArray(current) ? current : [];
+                    const kept = list.filter(entry => handle.keyOf(entry) !== key);
+                    const next = [item].concat(kept);
+                    const cap = limit ?? 0;
+                    return cap > 0 ? next.slice(0, cap) : next;
+                });
+            }
+
+            function append(item: var): void {
+                const key = handle.keyOf(item);
+                handle.store.update(handle.name, current => {
+                    const list = Array.isArray(current) ? current : [];
+                    return list.filter(entry => handle.keyOf(entry) !== key).concat([item]);
+                });
+            }
+
+            function remove(idOrItem: var): void {
+                const key = handle.keyOf(idOrItem);
+                handle.store.update(handle.name, current => {
+                    const list = Array.isArray(current) ? current : [];
+                    return list.filter(entry => handle.keyOf(entry) !== key);
+                });
+            }
+
+            // Returns whether the item is now in the list, so a caller can report "Added" or
+            // "Removed" without asking again.
+            function toggle(item: var): bool {
+                const present = handle.has(item);
+                if (present)
+                    handle.remove(item);
+                else
+                    handle.add(item, 0);
+                return !present;
+            }
+
+            // Replaces the matching entry, keeping its position - for editing an entry in
+            // place, where add() would move it to the top.
+            function update(item: var): void {
+                const key = handle.keyOf(item);
+                handle.store.update(handle.name, current => {
+                    const list = Array.isArray(current) ? current : [];
+                    const index = list.findIndex(entry => handle.keyOf(entry) === key);
+                    if (index === -1)
+                        return [item].concat(list);
+                    const next = list.slice();
+                    next[index] = item;
+                    return next;
+                });
+            }
+
+            function move(from: int, to: int): void {
+                handle.store.update(handle.name, current => {
+                    const list = Array.isArray(current) ? current.slice() : [];
+                    if (from < 0 || from >= list.length || to < 0 || to >= list.length)
+                        return list;
+                    const [item] = list.splice(from, 1);
+                    list.splice(to, 0, item);
+                    return list;
+                });
+            }
+
+            function removeWhere(predicate: var): void {
+                handle.store.update(handle.name, current => {
+                    const list = Array.isArray(current) ? current : [];
+                    return list.filter(entry => !predicate(entry));
+                });
+            }
+
+            function replaceAll(items: var): void {
+                handle.store.set(handle.name, Array.isArray(items) ? items : []);
+            }
+
+            function clear(): void {
+                handle.store.set(handle.name, []);
+            }
+
+            // Clears, and offers an undo. The destructive verb on a list of things the user
+            // curated by hand should never be one-way.
+            function clearWithUndo(label: string): void {
+                const snapshot = handle.list.slice();
+                if (snapshot.length === 0)
+                    return;
+                handle.clear();
+                PluginHistory.recordWithToast({
+                    label: label ?? qsTr("Cleared %1").arg(handle.name),
+                    pluginId: handle.pluginId,
+                    icon: "delete_sweep",
+                    undo: () => handle.replaceAll(snapshot),
+                    redo: () => handle.clear()
+                });
+            }
+        }
     }
 
     // ------------------------------------------------------------------- sync
@@ -58,8 +236,8 @@ Singleton {
     // to push a change into exactly the store that changed.
 
     function __sync(): void {
-        for (const pluginId of Object.keys(root.stores)) {
-            const store = root.stores[pluginId];
+        for (const pluginId of Object.keys(Memo.stores)) {
+            const store = Memo.stores[pluginId];
             const stored = PluginConfig.data[pluginId]?.storage;
             if (store.__raw === stored)
                 continue;

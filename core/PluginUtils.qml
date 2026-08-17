@@ -25,6 +25,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "Memo.js" as Memo
 
 Singleton {
     id: root
@@ -296,6 +297,138 @@ Singleton {
             handler: callback ?? null
         });
         proc.running = true;
+    }
+
+    // ───────────────────────────────────────────────────── attribution ──
+    //
+    // A scoped view of everything here, carrying the plugin's id so the permission model has
+    // something to check and a refused call can name who was refused:
+    //
+    //     readonly property var utils: PluginUtils.as("gif-picker")
+    //
+    //     utils.copy(url)                 // needs "clipboard"
+    //     utils.exec(["xdg-open", url])    // needs "system-exec"
+    //     utils.notify("Saved", path)      // needs "notifications"
+    //     utils.get(url, {}, handle)       // needs "network"
+    //
+    // The unscoped functions still work and are still unattributed - which is right for the
+    // shell's own code, and is why undeclared use is reported rather than blocked. A plugin that
+    // wants its manifest to mean something uses this.
+    //
+    // Scopes are cached per plugin so `PluginUtils.as(id)` in a binding does not allocate.
+
+    // Scope cache in Memo.js, not a property: `as()` reads the cache it writes, and a plugin
+    // doing the documented thing - `readonly property var utils: PluginUtils.as("id")` - would
+    // then be a dependency cycle, which Qt resolves by dropping the binding.
+    function as(pluginId: string): var {
+        let existing = Memo.scopes[pluginId];
+        if (existing)
+            return existing;
+        existing = root.__scopeComponent.createObject(root, { pluginId: pluginId });
+        Memo.scopes[pluginId] = existing;
+        return existing;
+    }
+
+    readonly property Component __scopeComponent: Component {
+        QtObject {
+            id: scope
+
+            property string pluginId: ""
+
+            function allowed(permission: string, what: string): bool {
+                return PluginPermissions.check(scope.pluginId, permission, what);
+            }
+
+            // ---- clipboard
+
+            function copy(text: string): void {
+                if (scope.allowed("clipboard", qsTr("write to the clipboard")))
+                    PluginUtils.copy(text);
+            }
+
+            function copyTyped(text: string, mimeType: string): void {
+                if (scope.allowed("clipboard", qsTr("write to the clipboard")))
+                    PluginUtils.copyTyped(text, mimeType);
+            }
+
+            function copyFile(path: string, mimeType: string): void {
+                if (scope.allowed("clipboard", qsTr("write to the clipboard")))
+                    PluginUtils.copyFile(path, mimeType);
+            }
+
+            function paste(): string {
+                return scope.allowed("clipboard", qsTr("read the clipboard")) ? PluginUtils.paste() : "";
+            }
+
+            // ---- processes
+
+            function exec(command: var): void {
+                if (scope.allowed("system-exec", qsTr("run %1").arg(Array.isArray(command) ? command[0] : "a program")))
+                    PluginUtils.exec(command);
+            }
+
+            function run(command: var, callback: var): void {
+                if (scope.allowed("system-exec", qsTr("run %1").arg(Array.isArray(command) ? command[0] : "a program")))
+                    PluginUtils.run(command, callback);
+            }
+
+            function pipe(command: var, input: string, callback: var): void {
+                if (scope.allowed("system-exec", qsTr("run %1").arg(Array.isArray(command) ? command[0] : "a program")))
+                    PluginUtils.pipe(command, input, callback);
+            }
+
+            function openUrl(url: string): void {
+                // Opening a link is not "running a program" from the user's point of view, and
+                // gating it would make a plugin that shows a link unable to follow it.
+                PluginUtils.openUrl(url);
+            }
+
+            // ---- notifications
+
+            function notify(title: string, body: string, options: var): void {
+                if (scope.allowed("notifications", qsTr("post a notification")))
+                    PluginUtils.notify(title, body, options);
+            }
+
+            // ---- network
+            //
+            // Forwarded to PluginHttp with the id filled in, so a plugin does not have to repeat
+            // itself in every options object.
+
+            function get(url: string, options: var, callback: var): int {
+                return PluginHttp.get(url, Object.assign({ pluginId: scope.pluginId }, options ?? {}), callback);
+            }
+
+            function post(url: string, body: var, options: var, callback: var): int {
+                return PluginHttp.post(url, body, Object.assign({ pluginId: scope.pluginId }, options ?? {}), callback);
+            }
+
+            // ---- state
+
+            function store(): var {
+                return PluginStorage.of(scope.pluginId);
+            }
+
+            function collection(name: string): var {
+                return PluginStorage.collection(scope.pluginId, name);
+            }
+
+            // ---- feedback
+
+            function toast(text: string): int {
+                return PluginToast.show({ text: text, pluginId: scope.pluginId });
+            }
+
+            function record(label: string, undoRedo: var): int {
+                return PluginHistory.recordWithToast(Object.assign({ label: label, pluginId: scope.pluginId }, undoRedo ?? {}));
+            }
+
+            // ---- intents
+
+            function call(ref: string, args: var): var {
+                return PluginIntent.call(ref, args);
+            }
+        }
     }
 
     readonly property Component __pipeComponent: Component {

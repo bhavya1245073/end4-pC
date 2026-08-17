@@ -1,3 +1,5 @@
+pragma Singleton
+
 // Owns the live search providers plugins contribute, and aggregates their answers
 // for the launcher.
 //
@@ -14,8 +16,6 @@
 // the query is *pushed* into providers from a signal handler, and their answers are
 // *pulled* back out through the `results` property they own. That also gives async
 // providers a free path: assigning `results` later is picked up by the same binding.
-
-pragma Singleton
 
 import QtQuick
 import QtQml

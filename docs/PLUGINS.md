@@ -240,6 +240,171 @@ in the order they first occur, and rows without one come first — so a handful 
 settings need no groups at all, and twenty are not a wall. Keep `description` to one
 line: it sits under the control, and a three-line one makes the list ragged.
 
+## The 60-second plugin
+
+```bash
+scripts/new-plugin.sh tasks --type=window     # window, bar pill, IPC, intents, keybind, undo
+scripts/new-plugin.sh gifs  --type=picker     # searchable grid over an HTTP API
+```
+
+What comes out already works: it appears in Settings → Plugins, draws on screen, is
+addressable from the command line, answers intents, persists state, and passes
+`scripts/validate-plugin.sh`. Replace behaviour, not boilerplate.
+
+Then, always:
+
+```bash
+scripts/doctor.sh            # the one command that says whether anything is wrong
+```
+
+## Things you no longer write by hand
+
+Every row here is something plugins used to reimplement, each slightly differently and
+each getting a different part of it wrong.
+
+| Instead of | Use | Why it matters |
+| --- | --- | --- |
+| a `Loader` and hoping | `PluginErrorBoundary` | A failed plugin draws an error card with the message and a Copy button, instead of an empty gap that looks like "not configured". |
+| `GridView` maths, a debounce timer, a spinner, an empty state | `PluginContentView` | Grid/list/detail, debounced search, category chips, arrow keys, hover actions, progressive thumbnails, animation that stops when the screen locks. |
+| `curl` in a `Process`, or bare `XMLHttpRequest` | `PluginHttp` | Cache with a TTL, timeout, real status codes, parsed JSON, and the callback dropped if its owner is destroyed. |
+| a `Rectangle` and a `Timer` for "Copied!" | `PluginToast` | One queue, one surface, above everything, still visible after the popup that raised it closed. |
+| `DropArea` + URI trimming + a highlight rectangle | `PluginDropTarget` | Decoded paths, correct scheme stripping, and a highlight that always clears. |
+| `Drag.active` + `mimeData` + `grabToImage` + a threshold | `PluginDraggable` | Drags into Discord, Firefox and file managers, and stays clickable. |
+| JSON in and out of `plugins.json` by hand | `PluginStorage.collection` | `add`/`remove`/`toggle`/`has`/`list`, de-duplicated, capped, persisted, reactive. |
+| "which app was I in?" | `PluginContext` | The last *real* focused window, the primary selection, the clipboard, the active monitor. |
+| a `Timer` that runs behind the lock screen | `PluginLifecycle` | `awake` and `animate`, so nothing costs battery while nobody is looking. |
+| no undo at all | `PluginHistory` | One `record()` call gives the user Ctrl+Z and an Undo button in the toast. |
+| five QML files for five surfaces | `PluginSurface` | `barContent`, `flyoutContent`, `fullContent`; the host picks. |
+| a private `IpcHandler` nobody can discover | `provides.actions` | The launcher, a keybind, other plugins and the CLI all reach the same function. |
+
+## Actions: write a function once, reach it from everywhere
+
+Declare it:
+
+```json
+"actions": [{
+    "id": "search",
+    "label": "Search GIFs",
+    "icon": "gif",
+    "schema": { "query": { "type": "string", "required": true } }
+}]
+```
+
+Implement it as an ordinary IPC function of the same name:
+
+```qml
+// GifPickerIpc.qml, declared under provides.ipc
+PluginIpc {
+    function search(query: string): string {
+        PanelRegistry.open("gif-picker", ({}));
+        GifState.search(query);
+        return `searching for ${query}`;
+    }
+}
+```
+
+That is the whole integration. All of these now work:
+
+```bash
+qs -c end4-pC ipc call gifs search cat                  # the plugin's own command
+qs -c end4-pC ipc call intent call gif-picker:search 'query=cat'
+qs -c end4-pC ipc call intent call gif-picker:search cat   # bare value fills the first argument
+```
+
+```qml
+PluginIntent.call("gif-picker:search", { query: "cat" })   // from any other plugin
+```
+
+and typing `gif cat` in the launcher runs it inline, because the launcher matches declared
+actions and hands the trailing words to the first required argument.
+
+Arguments are checked against `schema` **before** your function runs: a missing required
+one, a non-numeric `int`, a value outside `oneOf` are all reported to the caller. A `path`
+is expanded, so `~/shot.png` arrives absolute. That is why the body above can use `query`
+without guarding it.
+
+If you want a different shape - several handlers, or one that returns a value from
+somewhere other than an IPC function - use `PluginIntentHandler`, and put it in a file the
+host *instantiates* (a `provides.ipc` or `provides.services` entry). Not in a singleton: a
+singleton is not created until something reads it, so the handler would register the first
+time the user opened your window - which is exactly when nobody needs an intent.
+
+## Permissions
+
+```json
+"permissions": ["network", "clipboard", "storage"]
+```
+
+Shown in Settings → Plugins **before** the user switches the plugin on, with a toggle for
+each. This is not a sandbox - plugin QML runs in the shell's process - but the toggles have
+teeth for anything routed through a scoped facade:
+
+```qml
+readonly property var utils: PluginUtils.as("gif-picker")
+
+utils.get(url, { cacheTtl: 60000 }, handle)   // refused without "network"
+utils.copy(text)                              // refused without "clipboard"
+utils.exec(["xdg-open", url])                  // refused without "system-exec"
+utils.notify(title, body)                      // refused without "notifications"
+```
+
+`PluginUtils.as(id)` is worth using for its own sake: it also gives you `store()`,
+`collection(name)`, `toast(text)` and `record(label, {undo, redo})` with the plugin id
+already filled in.
+
+Undeclared use is allowed, not blocked - otherwise this could not have been added without
+breaking every existing plugin. It is reported instead, by `scripts/doctor.sh` and in the
+settings page, which is where a manifest gets brought up to date.
+
+| Permission | Gates |
+| --- | --- |
+| `network` | `PluginHttp`, and `utils.get`/`utils.post` |
+| `clipboard` | `utils.copy`, `copyTyped`, `copyFile`, `paste` |
+| `storage` | `PluginStorage` |
+| `system-exec` | `utils.exec`, `utils.run`, `utils.pipe` |
+| `notifications` | `utils.notify`, `PluginNotifications` |
+| `window-manager` | `PluginWM` |
+
+## The power contract
+
+```qml
+Timer { running: PluginLifecycle.awake && root.visible }
+AnimatedImage { playing: PluginLifecycle.animate }
+```
+
+`awake` is false while the screen is locked or the session is idle - read from
+`ext-idle-notify`, the same protocol the rest of the session uses, so idle inhibitors are
+respected. `animate` is additionally false in power-saver mode. `pollFactor` is what to
+multiply a background interval by (5× in power-saver), so stale data beats no data.
+
+`PluginTimer`, `PluginContentView` and `PluginSparkline` already respect all of this, so a
+plugin built on them gets the contract without writing a line.
+
+For cleanup a binding cannot express - dropping a decoded cache, cancelling requests -
+there are `suspended()`, `resumed()` and `aboutToSuspendSystem()`.
+
+## Undo
+
+```qml
+const snapshot = shelf.items.slice()      // copy first - see below
+shelf.clear()
+
+PluginHistory.recordWithToast({
+    label: qsTr("Cleared the shelf"),
+    pluginId: "dropover",
+    undo: () => shelf.restore(snapshot),
+    redo: () => shelf.clear()
+})
+```
+
+The user gets a toast with an Undo button, and Ctrl+Z (bound as `quickshell:undo`) works
+from anywhere. One global stack, ordered by time, because the user has one idea of "what
+did I just do" and a per-plugin stack would make Ctrl+Z depend on which surface happened to
+have focus.
+
+**Copy the state before you destroy it.** `undo` is a closure: capturing a reference to the
+live list and then clearing that list gives you an undo that restores an empty list.
+
 ## Several files, subfolders and singletons
 
 A plugin folder is not a QML module, so type resolution follows plain QML file
@@ -729,6 +894,53 @@ anything outside it closes the popup — one surface, no hover, no race.
 
 `close()` and `toggle()` are available if you want to drive it yourself.
 
+### PluginContentView
+
+The component most plugins are. A GIF picker, an emoji picker, clipboard history,
+bookmarks, recent files, a colour palette - all the same view with different contents.
+
+```qml
+PluginContentView {
+    pluginId: "gif-picker"
+    items: GifState.results        // plain objects, any shape
+    loading: GifState.searching
+    mode: "grid"                   // "grid" | "list" | "detail" | "carousel"
+
+    onSearch: text => GifState.search(text)
+    onActivated: item => PluginUtils.copy(item.url)
+
+    actions: [
+        { id: "fav", icon: "star", label: qsTr("Favourite"),
+          onTriggered: item => favourites.toggle(item) }
+    ]
+}
+```
+
+Recognised item fields, all optional: `id`, `title`/`name`/`label`, `subtitle`, `icon`,
+`thumbnail`, `preview`, `image`, `badge`, `category`, `colour`. Anything else is yours and
+reaches a custom `delegate` untouched.
+
+**Bind `onSearch` only for provider-side search.** With it bound, `items` is shown as given
+and the debounced query is handed over; without it, the view filters `items` itself across
+`searchFields`. Doing both double-filters results the server already narrowed, which is the
+bug that makes a remote picker show nothing for a query that clearly matched.
+
+Keyboard, for free: arrows (grid-aware), Home/End, PageUp/PageDown, Enter to activate, Tab
+to preview, Escape to clear then dismiss. Call `focusSearch()` when your window opens.
+
+Animated previews play only for the item under the pointer and only while
+`PluginLifecycle.animate` - one decoder for a grid of forty, none behind a lock screen.
+
+### PluginProgressiveImage
+
+What makes the grid above never show an empty cell: the still `thumbnail` loads immediately,
+the animated `preview` is built only when `playing`, and it is only shown once it has a
+frame. Fallbacks for a colour swatch, a Material Symbol, or a text label, and a broken-image
+mark for a URL that failed - so a dead link does not look like a slow one forever.
+
+Images are decoded at the size they are drawn at, not the size they were published at. In a
+grid of forty thumbnails that is the difference between tens and hundreds of megabytes.
+
 ### PluginRow, PluginCard, PluginSeparator
 
 The three layouts every status panel re-invents, and the three most often got
@@ -744,6 +956,69 @@ PluginRow { label: qsTr("Cycles"); value: `${cycles}`; shown: cyclesKnown }
 
 `PluginCard` is a correct surface with padding, and optionally `interactive: true`
 plus `onClicked`. `PluginSeparator` is a hairline at the right opacity.
+
+### PluginDropTarget and PluginDraggable
+
+```qml
+PluginDropTarget {
+    anchors.fill: parent
+    onFilesDropped: paths => shelf.park(paths)      // real paths, already decoded
+    onTextDropped: text => notes.add(text)
+}
+
+PluginDraggable {
+    path: item.filePath        // drags into Discord, Firefox, a file manager
+    onClicked: open(item)      // still clickable: the drag has a threshold
+
+    Image { source: item.thumbnail }
+}
+```
+
+The hand-written versions of these are wrong in the same three ways every time:
+`replace("file://", "")` corrupts a path containing that substring, a missing
+`decodeURIComponent` turns `my report.pdf` into `my%20report.pdf`, and `onExited` does not
+fire on an accepted drop so the highlight sticks. `PluginDraggable` also grabs the drag
+image on press, because without one the drag shows nothing under the cursor and people let
+go.
+
+### PluginBackdropBlur, PluginGlowBorder, PluginMeshGradient
+
+```qml
+PluginBackdropBlur { anchors.fill: parent; radius: Theme.radius.l }
+PluginGlowBorder { target: card; active: dropTarget.dragging }
+PluginMeshGradient { anchors.fill: parent; radius: Theme.radius.l }
+```
+
+Be clear about what the blur is: a layer-shell client **cannot read the compositor's
+framebuffer**, so no QML can blur another application's window. `PluginBackdropBlur` blurs
+the shell's own wallpaper, which over the desktop is indistinguishable from the real thing
+and over a browser window is a tinted panel. For a true backdrop blur the compositor has to
+do it:
+
+```bash
+qs -c end4-pC ipc call caps fx      # prints the exact layerrule lines to add
+```
+
+All three stop animating when `PluginFX.effectsAllowed` is false - power-saver, lock screen,
+or the effects setting off.
+
+### PluginSurface
+
+One file that renders correctly wherever it is mounted:
+
+```qml
+PluginSurface {
+    pluginId: "battery"
+    barContent: Component { PluginBarWidget { ... } }
+    flyoutContent: Component { Column { ... } }
+    fullContent: Component { BatteryHistoryChart {} }
+}
+```
+
+Point the manifest's bar widget, desktop widget and panel at this one file. A missing slot
+falls back to the next most detailed one, so you can start with `fullContent` alone and
+specialise later without changing where it is mounted. Read `PluginResponsive.isCompact`,
+`.isNarrow`, `.vertical` or `.slotName` for finer decisions.
 
 ### PluginBackgroundWidget
 
@@ -911,11 +1186,35 @@ installing anything.
 
 ## Checklist
 
+Or just run `scripts/doctor.sh`, which checks all of this and more.
+
 - [ ] Folder name matches `id`.
 - [ ] `apiVersion` is 1.
 - [ ] Every `entry` file exists and its root type is right for its kind.
 - [ ] No `required property` on the root of an entry file - the loader can't fill
       those in.
+- [ ] Every `pragma Singleton` file has a `qmldir` line, and the pragma is on line 1.
 - [ ] Every user-visible string wrapped in `Translation.tr(...)`.
 - [ ] Every setting the plugin reads is declared in `settings`.
+- [ ] Every capability the plugin uses is declared in `permissions`.
+- [ ] Anything destructive records an undo.
+- [ ] Timers and animations are gated on `PluginLifecycle.awake`/`.animate`.
 - [ ] Shortcut names are unique.
+
+## The traps, in one place
+
+All of these compile, none of them warn, and each has cost someone an afternoon.
+
+| Symptom | Cause |
+| --- | --- |
+| `MyState.thing is not a function` | The singleton has no `qmldir` line, so `MyState` resolved to the *type*, not the instance. |
+| A singleton silently isn't one | `pragma Singleton` is not on line 1. The scanner stops at the first `{`, including one inside a comment. |
+| "Binding loop detected" on a `store` or `utils` property | A cache read *and* written inside one function must live in `Memo.js`, not in a QML property. |
+| An entry file never instantiates | `required property` on its root. |
+| `ipc call` says "function not found" | The function is missing a parameter or return type annotation. |
+| "Cannot assign to non-existent default property" inside `PluginIpc` | `IpcHandler` takes no child objects and no declared properties. Put handlers in a `provides.services` file. |
+| An intent declared but "nothing is handling it" | The handler is in a singleton nothing has read yet. Move it to a file the host instantiates. |
+| A popup with buttons can't be clicked | `PluginPopup` needs `dismiss: "manual"`. |
+| A widget vanishes from the bar with no error | It failed to load. `PluginErrorBoundary` now draws a pill there instead - check the bar. |
+| Layout permanently corrupted after an animation | Something assigned `x`/`y` to a `RowLayout`/`ColumnLayout` child. Use `transform: Translate`. |
+| An icon renders as the word `PLUG` | An invented Material Symbol name. `scripts/check-icons.sh`. |

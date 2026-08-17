@@ -137,7 +137,7 @@ needs. `core/api.json` is the generated catalogue of all of them; `scripts/api.s
 every reader), `PluginAudio`, `PluginMedia`, `PluginWM` (compositor-agnostic),
 `PluginPower`, `PluginDisplay`, `PluginNetwork`, `PluginBluetooth`, `PluginPrivacy`,
 `PluginNotifications`, `PluginApps`, `PluginDialogs`, `PluginFs`, `PluginTimer`,
-`PluginStorage`, `PluginBus`, `PluginUtils`.
+`PluginStorage`, `PluginBus`, `PluginUtils`, `PluginHttp`, `PluginContext`.
 
 Three of those exist because the obvious implementation was wrong rather than merely
 missing. `PluginPrivacy` replaced a `Privacy.qml` that assigned arrays to `bool`
@@ -147,13 +147,45 @@ Pipewire. `PluginUtils.pipe` exists because the alternative - `bash -c` with a p
 interpolated into the string - was how the clipboard service handled arbitrary copied
 text.
 
+**The platform layer** — what a plugin gets without asking, added because every plugin was
+reimplementing it:
+
+| File | Does | The failure it replaces |
+| --- | --- | --- |
+| `PluginErrorBoundary` | loads plugin QML and draws the error in its place | a widget that fails to compile leaves a gap indistinguishable from "not configured" |
+| `PluginIntent` | one addressable verb per plugin action, from the launcher, the CLI, a keybind or a peer plugin | plugins could not call each other at all - a plugin cannot import another plugin |
+| `PluginIntentHandler` | implements one action, for when an IPC function is the wrong shape | — |
+| `PluginHttp` | HTTP with a TTL cache, a timeout, real status codes and owner-scoped cancellation | `curl` in a `Process`, no cache, error pages parsed as data, callbacks writing to destroyed objects |
+| `PluginToast` + `PluginToastHost` | one queue, one surface, above everything | a `Rectangle` and a `Timer` per plugin, drawn inside the popup the click had just closed |
+| `PluginHistory` | one global undo stack, Ctrl+Z, and an Undo button in the toast | no undo anywhere |
+| `PluginLifecycle` | `awake`/`animate`/`pollFactor` from `ext-idle-notify` and the battery | forty GIFs animating behind a lock screen |
+| `PluginPermissions` | declared capabilities, shown before enabling and revocable after | nothing to read before trusting a plugin |
+| `PluginContentView` | grid/list/detail with debounced search, keyboard navigation, hover actions, empty and loading states | ~200 lines per picker, each getting a different part wrong |
+| `PluginProgressiveImage` | thumbnail then animation, decoded at draw size | blank cells for seconds, and full-size decodes in a 132 px grid |
+| `PluginDropTarget`, `PluginDraggable` | drops with decoded paths; drags into other applications | `replace("file://", "")`, missing `decodeURIComponent`, highlights that stick |
+| `PluginFX` + `PluginBackdropBlur`/`GlowBorder`/`MeshGradient` | effects, honest about what a Wayland client can sample | "acrylic" that is a flat fill |
+| `PluginSurface` + `PluginResponsive` | one file per plugin, five surfaces | five files with five copies of the state logic |
+
+`PluginIntent` is the one that changes what is possible rather than what is convenient.
+Plugin QML is loaded from a URL, so its singletons are in no module another plugin can name -
+which is why cross-plugin features were never written. An intent is a string, and a string
+always resolves. An action also needs no handler object when the plugin already exposes an
+IPC function of that name, so the common case is a manifest entry and nothing else.
+
 **Theming** — `Theme` plus `Palette.js`, which generates a full Material 3 tonal
 palette from one colour in CIELCh, so a plugin can theme itself from an album cover or
 a wallpaper without the shell's colour pipeline being involved.
 
 **Performance** — see below: `ComponentCache`, `Prewarm`, `Stable`, `Memo.js`, `Perf`.
 
-**Command line** — `PluginCommands` provides the `plugins` and `panels` IPC targets.
+`Memo.js` also holds the handle caches for `PluginStorage.of`, `.collection` and
+`PluginUtils.as`. Those look like they belong in properties, and cannot be: each reads the
+cache it also writes, and a QML property read-then-written inside one binding evaluation is a
+dependency cycle - `readonly property var store: PluginStorage.of("x")`, the documented
+usage, produced "Binding loop detected" and Qt dropped the binding.
+
+**Command line** — `PluginCommands` provides the `plugins`, `panels`, `intent`, `history`,
+`http` and `caps` IPC targets.
 
 ## What happens when you toggle a plugin
 
@@ -241,6 +273,22 @@ from `qs.modules.ii.sidebarRight.volumeMixer`. Moving those two into
 `modules/common/widgets/` would remove the last edges.
 
 ## Checks
+
+`scripts/doctor.sh` is the entry point. It runs the others, and adds what only a *running*
+shell can answer:
+
+| Check | Why static analysis cannot do it |
+| --- | --- |
+| actions declared with no handler | resolution depends on which plugins are loaded and what registered |
+| permissions used but not declared | observed at the call site, not visible in the source |
+| singletons with no `qmldir` line | the file compiles; it just resolves to the type instead of the instance |
+| `qs.*` modules a plugin imports but nothing anchors | the import is valid, it simply is not registered yet at load time |
+
+That last pair is worth stating plainly: **a `pragma Singleton` file without a `qmldir`
+entry still resolves.** Every call on it fails with `is not a function` and every property
+reads `undefined`, with no warning anywhere, because a type reference to an uninstantiated
+component is legal QML. `scripts/new-plugin.sh` now writes the `qmldir`, and the doctor
+checks for it.
 
 `scripts/check-qml.sh [subtree]` has ten phases and exits non-zero on any failure, so
 it works as a pre-commit hook. The later phases exist because each caught a bug that
