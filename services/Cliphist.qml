@@ -54,6 +54,52 @@ Singleton {
         readProc.running = true
     }
 
+    // Is this entry an image? cliphist labels them, e.g. "42\t[[ binary data 40 KiB png 800x600 ]]".
+    function isImageEntry(entry): bool {
+        return /\[\[\s*binary data .*(png|jpe?g|gif|webp|bmp)/i.test(`${entry}`);
+    }
+
+    function mimeOf(entry): string {
+        const match = /binary data .*?\b(png|jpeg|jpg|gif|webp|bmp)\b/i.exec(`${entry}`);
+        if (!match)
+            return "image/png";
+        const kind = match[1].toLowerCase();
+        return `image/${kind === "jpg" ? "jpeg" : kind}`;
+    }
+
+    // Decode an image entry to a file and put *the file* on the clipboard.
+    //
+    // Images cannot go through a callback. `decode` writes raw PNG bytes to stdout, and stdout
+    // arrives here as a QString: the bytes are decoded as UTF-8, every invalid sequence becomes
+    // U+FFFD, and re-encoding that on the way out produces different bytes. It is also offered as
+    // text/plain, so pasting into an image editor yields a few thousand lines of replacement
+    // characters rather than a picture. The bytes have to reach wl-copy without passing through JS.
+    function copyImage(entry, then) {
+        const target = `${PluginFs.runtimeDir}/cliphist-${Date.now()}.bin`;
+        const mime = root.mimeOf(entry);
+        const decode = root.cliphistBinary.includes("cliphist")
+            ? { argv: [root.cliphistBinary, "decode"], stdin: entry }
+            : { argv: [root.cliphistBinary, "decode", `${entry}`.split("\t")[0]], stdin: null };
+
+        // `sh -c` with a fixed script and the path as "$@": nothing is interpolated, so an entry
+        // number or a runtime path with a quote in it stays data.
+        const script = 'out="$1"; shift; "$@" > "$out"';
+        const argv = ["sh", "-c", script, "sh", target].concat(decode.argv);
+
+        const finish = (code) => {
+            if (code !== 0)
+                return;
+            PluginUtils.copyFile(target, mime);
+            if (then)
+                PluginTimer.after(80, then);
+        };
+
+        if (decode.stdin === null)
+            PluginUtils.run(argv, (_out, code) => finish(code));
+        else
+            PluginUtils.pipe(argv, decode.stdin, (_out, code) => finish(code));
+    }
+
     // Decode an entry and put it on the clipboard.
     //
     // The entry goes down cliphist.s stdin rather than into a shell command line. A clipboard entry
@@ -61,6 +107,10 @@ Singleton {
     // copied, quotes and newlines and backticks included - and escaping it correctly was one
     // StringUtils call away from a command injection.
     function copy(entry) {
+        if (root.isImageEntry(entry)) {
+            root.copyImage(entry, null);
+            return;
+        }
         if (root.cliphistBinary.includes("cliphist")) { // Classic cliphist
             PluginUtils.pipe([root.cliphistBinary, "decode"], entry, decoded => PluginUtils.copy(decoded));
         } else { // Stash
@@ -76,6 +126,10 @@ Singleton {
     // has to happen after the clipboard is set, which is why it is in the callback.
     function paste(entry) {
         const press = () => PluginUtils.exec(root.pressPasteCommand.split(" "));
+        if (root.isImageEntry(entry)) {
+            root.copyImage(entry, () => PluginTimer.after(root.pasteDelay * 1000, press));
+            return;
+        }
         if (root.cliphistBinary.includes("cliphist")) { // Classic cliphist
             PluginUtils.pipe([root.cliphistBinary, "decode"], entry, decoded => {
                 PluginUtils.copy(decoded);

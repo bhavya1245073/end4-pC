@@ -16,7 +16,7 @@ MouseArea {
 
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     drag.target: draggable ? dragProxy : undefined
-    cursorShape: (draggable && containsPress) ? Qt.ClosedHandCursor : draggable ? Qt.OpenHandCursor : Qt.ArrowCursor
+    cursorShape: (draggable && dragging) ? Qt.ClosedHandCursor : draggable ? Qt.OpenHandCursor : Qt.ArrowCursor
 
     onClicked: (mouse) => {
         if (mouse.button === Qt.RightButton) {

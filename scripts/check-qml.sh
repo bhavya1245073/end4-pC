@@ -51,6 +51,20 @@ cd "$ROOT"
 
 [[ $# -gt 0 ]] || set -- .
 mapfile -t files < <(find "$@" -name '*.qml' -not -name '.qml-check-harness.qml' | sort)
+
+# A zero-byte .qml file is not a QML error - the engine only complains when something tries to
+# instantiate it, and nothing does at compile time. An accidentally truncated file therefore passed
+# every phase below, was committed, and only turned up as a feature that had silently stopped
+# existing. Cheap to check, so check it first.
+empty=()
+for f in "${files[@]}"; do
+    [[ -s "$f" ]] || empty+=("$f")
+done
+if (( ${#empty[@]} > 0 )); then
+    printf '    FAIL  empty file: %s\n' "${empty[@]}"
+    echo "QMLCHECK DONE checked=0 failures=${#empty[@]}"
+    exit 1
+fi
 [[ ${#files[@]} -gt 0 ]] || { echo "no .qml files under $*"; exit 1; }
 
 # Every `qs.*` module the tree imports, whether or not it is in the subtree being

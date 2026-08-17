@@ -45,7 +45,12 @@ AbstractWidget {
     Behavior on opacity {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
     }
-    scale: (draggable && containsPress) ? 1.05 : 1
+    // Lifts on an actual drag, not on any press. `containsPress` is also true while the resize
+    // handle in the corner is held - the handle is a child of this MouseArea - so resizing scaled
+    // the widget to 1.05 for the whole gesture. The handle computes its delta from global
+    // coordinates, so a scaled widget moves the handle out from under the cursor and the size
+    // jumps. `dragging` is `drag.active`, which stays false while a child holds the grab.
+    scale: (draggable && dragging) ? 1.05 : 1
     Behavior on scale {
         animation: Appearance.animation.elementResize.numberAnimation.createObject(this)
     }
