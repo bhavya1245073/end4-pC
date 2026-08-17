@@ -93,6 +93,10 @@ Singleton {
     property int revision: 0
 
     function state(id: string): var {
+        // An unnamed panel has no state. Creating one would leave a "" key in `states`, which
+        // `openIds` and the settings GUI both enumerate.
+        if (!id)
+            return null;
         let existing = root.states[id];
         if (existing)
             return existing;

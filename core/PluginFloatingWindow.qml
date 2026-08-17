@@ -35,7 +35,8 @@ Item {
     id: root
 
     // Identity. `pluginId` is what plugins.json is keyed on, `windowId` distinguishes several
-    // windows belonging to one plugin. `panelId` is the PanelRegistry id (defaults to pluginId).
+    // windows belonging to one plugin, `panelId` is the PanelRegistry id it answers to (defaults to
+    // `pluginId`, which is what you want unless one plugin owns several addressable windows).
     property string pluginId: ""
     property string windowId: "window"
     property string panelId: root.pluginId
@@ -50,15 +51,33 @@ Item {
     // single item; PluginIconButton is the intended content.
     property Component actions: null
 
-    property bool open: (root.panelId && PanelRegistry.state(root.panelId)) ? PanelRegistry.state(root.panelId).open : false
+    // Whether the window is up. Derived, never assigned: the registry is the single source of truth.
+    //
+    // It has to be. A panel is opened by a keybind, by `qs ipc`, by a launcher action, by a context
+    // menu and by the plugin itself, and PanelRegistry is the only thing that hears all of them. A
+    // window keeping its own copy of "am I open" falls out of step with the first route it does not
+    // hear about - and then toggling it works on every other press, because the registry and the
+    // window disagree about which way the toggle should go.
+    //
+    // Route writes through show()/hide()/toggle(). Assigning `open` cannot desync it, because there
+    // is nothing to assign.
+    readonly property bool open: root.addressable ? panelBinding.open : root.localOpen
 
-    Connections {
-        target: (root.panelId && PanelRegistry.state(root.panelId)) ? PanelRegistry.state(root.panelId) : null
-        function onOpenChanged(): void {
-            if (root.panelId && PanelRegistry.state(root.panelId))
-                root.open = PanelRegistry.state(root.panelId).open;
-        }
+    // Why the panel was opened, when it was opened through the registry: PanelRegistry.open(id, args)
+    // args, `{}` otherwise. Lets one window serve several entry points.
+    readonly property var openArgs: panelBinding.args
+
+    readonly property bool addressable: root.panelId.length > 0
+
+    // The declarative half of PanelRegistry: `open`/`args` tracked as bindings, no signal handlers.
+    PanelState {
+        id: panelBinding
+        panel: root.panelId
     }
+
+    // Fallback for a window with no pluginId and no panelId. It works, but nothing outside the
+    // plugin can reach it - see the warning in Component.onCompleted below.
+    property bool localOpen: false
 
     // Behaviour.
     property bool closeOnEscape: true
@@ -97,24 +116,24 @@ Item {
     default property Component content: null
 
     function show(): void {
-        if (root.panelId)
-            PanelRegistry.open(root.panelId);
+        if (root.addressable)
+            PanelRegistry.open(root.panelId, ({}));
         else
-            root.open = true;
+            root.localOpen = true;
     }
 
     function hide(): void {
-        if (root.panelId)
+        if (root.addressable)
             PanelRegistry.close(root.panelId);
         else
-            root.open = false;
+            root.localOpen = false;
     }
 
     function toggle(): void {
-        if (root.panelId)
-            PanelRegistry.toggle(root.panelId);
+        if (root.addressable)
+            PanelRegistry.toggle(root.panelId, ({}));
         else
-            root.open = !root.open;
+            root.localOpen = !root.localOpen;
     }
 
     // Puts the window back where `initialPosition` says, forgetting the stored position.
@@ -216,6 +235,11 @@ Item {
     Component.onCompleted: {
         if (PluginConfig.loaded)
             root.__place();
+
+        if (!root.addressable)
+            console.warn(`[pluginWindow] a PluginFloatingWindow titled "${root.title}" has no pluginId`
+                + ` or panelId: show()/hide() work, but no keybind, IPC call, launcher action or`
+                + ` PanelRegistry.toggle() can reach it, and its position will not be remembered.`);
     }
 
     // plugins.json arrives asynchronously; a window opened before it lands must still end up
