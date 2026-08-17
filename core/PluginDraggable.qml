@@ -59,11 +59,6 @@ Item {
     implicitHeight: childrenRect.height
 
     Item {
-        id: contentHolder
-        anchors.fill: parent
-    }
-
-    Item {
         id: payload
 
         // The dragged item is this proxy, not the content: dragging the content itself moves it
@@ -128,6 +123,11 @@ Item {
             if (payload.Drag.active)
                 payload.Drag.drop();
         }
+    }
+
+    Item {
+        id: contentHolder
+        anchors.fill: parent
     }
 
     // "/home/me/my report.pdf" -> "file:///home/me/my%20report.pdf"

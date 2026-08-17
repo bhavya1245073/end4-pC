@@ -369,7 +369,7 @@ PanelWindow {
 
                                     onClicked: mouse => {
                                         mouse.accepted = true;
-                                        DropShelfState.items = DropShelfState.items.filter((_, i) => i !== cardDelegate.index);
+                                        DropShelfState.remove(cardDelegate.path);
                                         if (DropShelfState.items.length === 0) {
                                             DropShelfState.hide();
                                         }
