@@ -11,25 +11,7 @@ LazyLoader {
     property Item hoverTarget
     default property Item contentItem
     property real popupBackgroundMargin: 0
-
-    property bool popupHovered: false
-    readonly property bool targetHovered: Boolean(hoverTarget && hoverTarget.containsMouse)
-    readonly property bool shouldBeActive: targetHovered || popupHovered
-
-    Timer {
-        id: graceCloseTimer
-        interval: 280
-    }
-
-    onShouldBeActiveChanged: {
-        if (shouldBeActive) {
-            graceCloseTimer.stop()
-        } else {
-            graceCloseTimer.restart()
-        }
-    }
-
-    active: shouldBeActive || graceCloseTimer.running
+    active: hoverTarget && hoverTarget.containsMouse
 
     readonly property bool barVertical: Config.options.bar.vertical
     readonly property string barEdge: {
@@ -126,15 +108,6 @@ LazyLoader {
                     popupWindow.innerContent.parent = popupBackground
                     popupWindow.innerContent.anchors.centerIn = popupBackground
                 }
-            }
-
-            HoverHandler {
-                id: popupHover
-                onHoveredChanged: root.popupHovered = hovered
-            }
-
-            Component.onDestruction: {
-                root.popupHovered = false
             }
         }
     }
